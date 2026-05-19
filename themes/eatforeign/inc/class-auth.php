@@ -1,0 +1,271 @@
+<?php
+/**
+ * Theme auth and social form handlers.
+ *
+ * @package EatForeignTheme
+ */
+
+declare(strict_types=1);
+
+namespace EatForeignTheme;
+
+use EatForeign\Repositories\CommunityRepository;
+use EatForeign\Repositories\ModerationRepository;
+use WP_Error;
+
+final class Auth {
+	public static function init(): void {
+		add_action( 'admin_post_nopriv_ef_login', [ self::class, 'handle_login' ] );
+		add_action( 'admin_post_ef_login', [ self::class, 'handle_login' ] );
+		add_action( 'admin_post_nopriv_ef_register', [ self::class, 'handle_register' ] );
+		add_action( 'admin_post_ef_register', [ self::class, 'handle_register' ] );
+		add_action( 'admin_post_ef_logout', [ self::class, 'handle_logout' ] );
+		add_action( 'admin_post_ef_update_profile', [ self::class, 'handle_update_profile' ] );
+		add_action( 'admin_post_ef_update_notifications', [ self::class, 'handle_update_notifications' ] );
+		add_action( 'admin_post_ef_change_password', [ self::class, 'handle_change_password' ] );
+		add_action( 'admin_post_ef_rate_dish', [ self::class, 'handle_rate_dish' ] );
+		add_action( 'admin_post_ef_toggle_celebration', [ self::class, 'handle_toggle_celebration' ] );
+		add_action( 'admin_post_ef_create_celebration_post', [ self::class, 'handle_create_celebration_post' ] );
+		add_action( 'admin_post_nopriv_ef_set_location', [ self::class, 'handle_set_location' ] );
+		add_action( 'admin_post_ef_set_location', [ self::class, 'handle_set_location' ] );
+	}
+
+	public static function handle_login(): void {
+		self::verify_nonce( 'ef_login' );
+
+		$email    = sanitize_email( (string) ( $_POST['email'] ?? '' ) );
+		$password = (string) ( $_POST['password'] ?? '' );
+		$user     = wp_authenticate( $email, $password );
+
+		if ( $user instanceof WP_Error ) {
+			self::redirect_with_error( home_url( '/login' ), $user->get_error_message() );
+		}
+
+		wp_set_current_user( $user->ID );
+		wp_set_auth_cookie( $user->ID );
+		wp_safe_redirect( home_url( '/account/profile' ) );
+		exit;
+	}
+
+	public static function handle_register(): void {
+		self::verify_nonce( 'ef_register' );
+
+		$email    = sanitize_email( (string) ( $_POST['email'] ?? '' ) );
+		$password = (string) ( $_POST['password'] ?? '' );
+		$name     = sanitize_text_field( (string) ( $_POST['display_name'] ?? '' ) );
+
+		if ( $email === '' || $password === '' ) {
+			self::redirect_with_error( home_url( '/register' ), __( 'Email and password are required.', 'eatforeign' ) );
+		}
+
+		if ( strlen( $password ) < 8 ) {
+			self::redirect_with_error( home_url( '/register' ), __( 'Password must be at least 8 characters.', 'eatforeign' ) );
+		}
+
+		if ( email_exists( $email ) ) {
+			self::redirect_with_error( home_url( '/register' ), __( 'An account with that email already exists.', 'eatforeign' ) );
+		}
+
+		$user_id = wp_create_user( $email, $password, $email );
+
+		if ( $user_id instanceof WP_Error ) {
+			self::redirect_with_error( home_url( '/register' ), $user_id->get_error_message() );
+		}
+
+		wp_update_user(
+			[
+				'ID'            => $user_id,
+				'display_name'  => $name !== '' ? $name : $email,
+				'user_nicename' => sanitize_title( $name !== '' ? $name : strstr( $email, '@', true ) ),
+			]
+		);
+
+		update_user_meta( $user_id, 'ef_display_name_override', $name );
+		update_user_meta( $user_id, 'ef_profile_public', 1 );
+
+		wp_set_current_user( $user_id );
+		wp_set_auth_cookie( $user_id );
+		wp_safe_redirect( home_url( '/account/profile' ) );
+		exit;
+	}
+
+	public static function handle_logout(): void {
+		self::verify_nonce( 'ef_logout' );
+		wp_logout();
+		wp_safe_redirect( home_url( '/' ) );
+		exit;
+	}
+
+	public static function handle_update_profile(): void {
+		self::verify_nonce( 'ef_update_profile' );
+		self::require_user();
+
+		CommunityRepository::update_profile(
+			get_current_user_id(),
+			[
+				'displayName'   => sanitize_text_field( (string) ( $_POST['display_name'] ?? '' ) ),
+				'homeCity'      => sanitize_text_field( (string) ( $_POST['home_city'] ?? '' ) ),
+				'bio'           => sanitize_textarea_field( (string) ( $_POST['bio'] ?? '' ) ),
+				'locationLabel' => sanitize_text_field( (string) ( $_POST['location_label'] ?? '' ) ),
+			]
+		);
+
+		if ( class_exists( ModerationRepository::class ) ) {
+			ModerationRepository::set_profile_public( get_current_user_id(), isset( $_POST['profile_public'] ) );
+		}
+
+		wp_safe_redirect( add_query_arg( 'updated', '1', home_url( '/account/profile' ) ) );
+		exit;
+	}
+
+	public static function handle_update_notifications(): void {
+		self::verify_nonce( 'ef_update_notifications' );
+		self::require_user();
+
+		$optin = isset( $_POST['email_optin'] ) ? '1' : '0';
+		update_user_meta( get_current_user_id(), 'ef_email_optin', $optin );
+
+		wp_safe_redirect( add_query_arg( 'updated', '1', home_url( '/account/notifications' ) ) );
+		exit;
+	}
+
+	public static function handle_change_password(): void {
+		self::verify_nonce( 'ef_change_password' );
+		self::require_user();
+
+		$user_id = get_current_user_id();
+		$user    = get_userdata( $user_id );
+
+		if (! $user instanceof \WP_User ) {
+			self::redirect_with_error( home_url( '/account/security' ), __( 'Could not load your account.', 'eatforeign' ) );
+		}
+
+		$current = (string) ( $_POST['current_password'] ?? '' );
+		$new     = (string) ( $_POST['new_password'] ?? '' );
+		$confirm = (string) ( $_POST['confirm_password'] ?? '' );
+
+		if (! wp_check_password( $current, $user->user_pass, $user_id ) ) {
+			self::redirect_with_error( home_url( '/account/security' ), __( 'Current password is incorrect.', 'eatforeign' ) );
+		}
+
+		if ( $new === '' || $new !== $confirm ) {
+			self::redirect_with_error( home_url( '/account/security' ), __( 'New passwords do not match.', 'eatforeign' ) );
+		}
+
+		if ( strlen( $new ) < 8 ) {
+			self::redirect_with_error( home_url( '/account/security' ), __( 'New password must be at least 8 characters.', 'eatforeign' ) );
+		}
+
+		wp_set_password( $new, $user_id );
+		wp_set_auth_cookie( $user_id );
+
+		wp_safe_redirect( add_query_arg( 'updated', '1', home_url( '/account/security' ) ) );
+		exit;
+	}
+
+	public static function handle_rate_dish(): void {
+		self::verify_nonce( 'ef_rate_dish' );
+		self::require_user();
+
+		$dish_id = absint( $_POST['dish_id'] ?? 0 );
+		$rating  = (float) ( $_POST['rating'] ?? 0 );
+		CommunityRepository::rate_dish( get_current_user_id(), $dish_id, $rating );
+
+		wp_safe_redirect( wp_get_referer() ?: home_url( '/' ) );
+		exit;
+	}
+
+	public static function handle_toggle_celebration(): void {
+		self::verify_nonce( 'ef_toggle_celebration' );
+		self::require_user();
+
+		$celebration_id = absint( $_POST['celebration_id'] ?? 0 );
+		CommunityRepository::toggle_celebration_completed( get_current_user_id(), $celebration_id );
+
+		wp_safe_redirect( wp_get_referer() ?: home_url( '/' ) );
+		exit;
+	}
+
+	public static function handle_set_location(): void {
+		self::verify_nonce( 'ef_set_location' );
+
+		$location = sanitize_text_field( (string) ( $_POST['location'] ?? '' ) );
+		$redirect = isset( $_POST['redirect_to'] ) ? esc_url_raw( (string) $_POST['redirect_to'] ) : '';
+
+		if ( $redirect === '' ) {
+			$redirect = wp_get_referer() ?: home_url( '/' );
+		}
+
+		$redirect = wp_validate_redirect( $redirect, home_url( '/' ) );
+
+		if ( is_user_logged_in() && class_exists( CommunityRepository::class ) ) {
+			CommunityRepository::update_profile(
+				get_current_user_id(),
+				[
+					'homeCity' => $location,
+				]
+			);
+		} else {
+			$cookie_path = defined( 'COOKIEPATH' ) && is_string( COOKIEPATH ) && COOKIEPATH !== '' ? COOKIEPATH : '/';
+			$cookie_opts = [
+				'expires'  => time() + YEAR_IN_SECONDS,
+				'path'     => $cookie_path,
+				'secure'   => is_ssl(),
+				'httponly' => true,
+				'samesite' => 'Lax',
+			];
+			if ( defined( 'COOKIE_DOMAIN' ) && is_string( COOKIE_DOMAIN ) && COOKIE_DOMAIN !== '' ) {
+				$cookie_opts['domain'] = COOKIE_DOMAIN;
+			}
+			setcookie( 'ef_header_location', $location, $cookie_opts );
+			$_COOKIE['ef_header_location'] = $location;
+		}
+
+		wp_safe_redirect( $redirect );
+		exit;
+	}
+
+	public static function handle_create_celebration_post(): void {
+		self::verify_nonce( 'ef_create_celebration_post' );
+		self::require_user();
+
+		$post_id = CommunityRepository::create_celebration_post(
+			get_current_user_id(),
+			[
+				'celebrationId'  => absint( $_POST['celebration_id'] ?? 0 ),
+				'dishId'         => absint( $_POST['dish_id'] ?? 0 ),
+				'caption'        => sanitize_textarea_field( (string) ( $_POST['caption'] ?? '' ) ),
+				'rating'         => (float) ( $_POST['rating'] ?? 0 ),
+				'imageUrl'       => esc_url_raw( (string) ( $_POST['image_url'] ?? '' ) ),
+				'restaurantName' => sanitize_text_field( (string) ( $_POST['restaurant_name'] ?? '' ) ),
+			]
+		);
+
+		$redirect = wp_get_referer() ?: home_url( '/' );
+
+		if ( $post_id > 0 && get_post_status( $post_id ) === 'pending' ) {
+			$redirect = add_query_arg( 'submitted', 'pending', $redirect );
+		}
+
+		wp_safe_redirect( $redirect );
+		exit;
+	}
+
+	private static function verify_nonce( string $action ): void {
+		if (! isset( $_POST['_wpnonce'] ) || ! wp_verify_nonce( sanitize_text_field( wp_unslash( (string) $_POST['_wpnonce'] ) ), $action ) ) {
+			wp_die( esc_html__( 'Invalid form submission.', 'eatforeign' ) );
+		}
+	}
+
+	private static function require_user(): void {
+		if ( get_current_user_id() <= 0 ) {
+			wp_safe_redirect( home_url( '/login' ) );
+			exit;
+		}
+	}
+
+	private static function redirect_with_error( string $url, string $message ): void {
+		wp_safe_redirect( add_query_arg( 'error', rawurlencode( $message ), $url ) );
+		exit;
+	}
+}

@@ -1,0 +1,26 @@
+# Ignore everything in wp-content by default.
+*
+
+# Keep ignore rules.
+!.gitignore
+
+# Custom EatForeign plugins (only these three).
+!plugins/
+plugins/*
+!plugins/eatforeign/
+!plugins/eatforeign/**
+!plugins/eatforeign-api/
+!plugins/eatforeign-api/**
+!plugins/eatforeign-content/
+!plugins/eatforeign-content/**
+
+# Custom EatForeign theme (only this theme).
+!themes/
+themes/*
+!themes/eatforeign/
+!themes/eatforeign/**
+
+# Noise inside tracked custom code.
+**/.git/
+**/.DS_Store
+**/*.log
