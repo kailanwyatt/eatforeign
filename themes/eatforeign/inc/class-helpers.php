@@ -51,6 +51,33 @@ final class Helpers {
 		return is_string( $page ) ? $page : '';
 	}
 
+	/**
+	 * Primary nav "Today" — home feed only, not every URL where WP still reports front page.
+	 */
+	public static function request_path(): string {
+		$request_path = '/';
+
+		if ( isset( $_SERVER['REQUEST_URI'] ) ) {
+			$request_path = (string) strtok( wp_unslash( (string) $_SERVER['REQUEST_URI'] ), '?' );
+		}
+
+		$request_path = '/' . trim( (string) $request_path, '/' );
+
+		return $request_path === '' ? '/' : $request_path;
+	}
+
+	public static function is_today_nav_active(): bool {
+		if ( self::current_ef_route() !== '' ) {
+			return false;
+		}
+
+		if ( is_singular() || is_search() || is_404() ) {
+			return false;
+		}
+
+		return self::request_path() === '/';
+	}
+
 	public static function header_location_value(): string {
 		if ( is_user_logged_in() ) {
 			$city = (string) get_user_meta( get_current_user_id(), 'ef_home_city', true );

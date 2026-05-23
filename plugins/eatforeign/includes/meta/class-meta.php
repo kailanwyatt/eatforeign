@@ -9,6 +9,7 @@ declare(strict_types=1);
 
 namespace EatForeign\Meta;
 
+use EatForeign\Support\ImageAttribution;
 use EatForeign\Support\PostType;
 use EatForeign\Support\Sanitizer;
 
@@ -43,6 +44,8 @@ final class Meta {
 		self::register_post_meta( PostType::DISH, 'ef_recipes', [ Sanitizer::class, 'recipes' ], 'array', 'recipe_list' );
 		self::register_post_meta( PostType::DISH, 'ef_celebration_ids', [ Sanitizer::class, 'post_ids' ], 'array', 'integer_list' );
 		self::register_post_meta( PostType::DISH, 'ef_suggested_images', [ Sanitizer::class, 'string_list' ], 'array' );
+		self::register_post_meta_without_rest( PostType::DISH, 'ef_suggested_image_sources', [ ImageAttribution::class, 'sanitize_meta_list' ], 'array' );
+		self::register_post_meta_without_rest( PostType::DISH, 'ef_featured_image_attribution', [ ImageAttribution::class, 'sanitize_meta_record' ], 'array' );
 		self::register_post_meta( PostType::DISH, 'ef_average_rating', static fn ( mixed $value ): float => round( (float) $value, 1 ), 'number' );
 		self::register_post_meta( PostType::DISH, 'ef_eat_yes_count', static fn ( mixed $value ): int => max( 0, (int) $value ), 'integer' );
 		self::register_post_meta( PostType::DISH, 'ef_eat_total_count', static fn ( mixed $value ): int => max( 0, (int) $value ), 'integer' );
@@ -123,6 +126,28 @@ final class Meta {
 		];
 
 		register_post_meta( $post_type, $key, $args );
+	}
+
+	/**
+	 * @param callable(mixed):mixed $sanitize
+	 */
+	private static function register_post_meta_without_rest(
+		string $post_type,
+		string $key,
+		callable $sanitize,
+		string $type
+	): void {
+		register_post_meta(
+			$post_type,
+			$key,
+			[
+				'type'              => $type,
+				'single'            => true,
+				'show_in_rest'      => false,
+				'auth_callback'     => static fn (): bool => current_user_can( 'edit_posts' ),
+				'sanitize_callback' => $sanitize,
+			]
+		);
 	}
 
 	/**

@@ -10,6 +10,7 @@ declare(strict_types=1);
 namespace EatForeign\GraphQL;
 
 use EatForeign\Repositories\CatalogRepository;
+use EatForeign\Support\ImageAttribution;
 use EatForeign\Repositories\CommunityRepository;
 use EatForeign\Repositories\PassportRepository;
 use EatForeign\Support\PostType;
@@ -277,10 +278,43 @@ final class Queries {
 			'culturalMeaning'   => (string) get_post_meta( $post->ID, 'ef_cultural_meaning', true ),
 			'averageRating'     => (float) get_post_meta( $post->ID, 'ef_average_rating', true ),
 			'ingredients'       => array_values( array_map( 'strval', (array) get_post_meta( $post->ID, 'ef_ingredients', true ) ) ),
-			'gallery'           => array_values( array_map( 'strval', (array) get_post_meta( $post->ID, 'ef_gallery_urls', true ) ) ),
-			'heroImage'         => (string) ( get_the_post_thumbnail_url( $post, 'large' ) ?: '' ),
-			'celebrationSlugs'  => self::map_post_ids_to_slugs( (array) get_post_meta( $post->ID, 'ef_celebration_ids', true ) ),
+			'gallery'                  => array_values( array_map( 'strval', (array) get_post_meta( $post->ID, 'ef_gallery_urls', true ) ) ),
+			'heroImage'                => (string) ( get_the_post_thumbnail_url( $post, 'large' ) ?: '' ),
+			'featuredImageAttribution' => self::map_image_attribution(
+				ImageAttribution::resolve_featured_for_post( $post->ID )
+			),
+			'imageAttributions'        => self::map_image_attribution_list(
+				ImageAttribution::merge_legacy_suggested_urls(
+					get_post_meta( $post->ID, 'ef_suggested_image_sources', true ),
+					get_post_meta( $post->ID, 'ef_suggested_images', true )
+				)
+			),
+			'celebrationSlugs'         => self::map_post_ids_to_slugs( (array) get_post_meta( $post->ID, 'ef_celebration_ids', true ) ),
 		];
+	}
+
+	/**
+	 * @return array<string, mixed>|null
+	 */
+	private static function map_image_attribution( ?array $record ): ?array {
+		if ( $record === null ) {
+			return null;
+		}
+
+		return ImageAttribution::to_graphql( $record );
+	}
+
+	/**
+	 * @param list<array<string, string>> $records
+	 * @return list<array<string, mixed>>
+	 */
+	private static function map_image_attribution_list( array $records ): array {
+		return array_values(
+			array_map(
+				static fn( array $record ): array => ImageAttribution::to_graphql( $record ),
+				$records
+			)
+		);
 	}
 
 	/**

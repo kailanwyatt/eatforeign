@@ -20,6 +20,8 @@ while ( have_posts() ) :
 	$ingredients      = array_values( array_filter( (array) get_post_meta( $dish_id, 'ef_ingredients', true ) ) );
 	$linked           = Data::posts_by_ids( (array) get_post_meta( $dish_id, 'ef_celebration_ids', true ) );
 	$hero_image       = Data::post_image( get_post() );
+	$image_caption    = Data::dish_image_caption( $dish_id );
+	$image_is_ai      = Data::dish_image_is_ai_generated( $dish_id );
 	$origin           = (string) get_post_meta( $dish_id, 'ef_origin_country', true );
 	$countries        = Data::dish_countries( $dish_id );
 	$cuisines         = Data::post_term_names( $dish_id, 'ef_cuisine' );
@@ -31,9 +33,14 @@ while ( have_posts() ) :
 	<div class="ef-shell ef-dish-page">
 		<article <?php post_class( 'ef-dish-hero' ); ?>>
 			<?php if ( $hero_image !== '' ) : ?>
-				<div class="ef-dish-hero__media">
+				<figure class="ef-dish-hero__media">
 					<img class="ef-dish-hero__image" src="<?php echo esc_url( $hero_image ); ?>" alt="<?php the_title_attribute(); ?>" />
-				</div>
+					<?php if ( $image_caption !== '' ) : ?>
+						<figcaption class="ef-dish-hero__caption<?php echo $image_is_ai ? ' ef-dish-hero__caption--ai' : ''; ?>">
+							<?php echo esc_html( $image_caption ); ?>
+						</figcaption>
+					<?php endif; ?>
+				</figure>
 			<?php endif; ?>
 			<div class="ef-dish-hero__body">
 				<?php if ( $countries['all'] !== [] ) : ?>

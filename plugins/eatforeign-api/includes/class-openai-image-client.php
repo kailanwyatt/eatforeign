@@ -113,19 +113,14 @@ final class OpenAIImageClient {
 		}
 
 		self::increment_daily_count();
-
-		$existing = get_post_meta( $dish_id, 'ef_ai_generated_images', true );
-		if ( ! is_array( $existing ) ) {
-			$existing = [];
-		}
-		$existing[] = esc_url_raw( $image_url );
-		update_post_meta( $dish_id, 'ef_ai_generated_images', array_values( array_unique( $existing ) ) );
+		DishGeneratedImageStore::save( $dish_id, $image_url );
 
 		Logger::log( "OpenAIImageClient: SUCCESS for dish ID {$dish_id}." );
 
 		return [
 			'imageUrl' => $image_url,
 			'prompt'   => $prompt,
+			'provider' => 'openai',
 		];
 	}
 

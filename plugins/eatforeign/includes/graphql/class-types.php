@@ -46,25 +46,46 @@ final class Types {
 		);
 
 		register_graphql_object_type(
+			'EatForeignImageAttribution',
+			[
+				'description' => 'Photo credit and license for a remote or generated image',
+				'fields'      => [
+					'url'           => [ 'type' => 'String' ],
+					'sourceType'    => [ 'type' => 'String' ],
+					'sourceName'    => [ 'type' => 'String' ],
+					'author'        => [ 'type' => 'String' ],
+					'license'       => [ 'type' => 'String' ],
+					'licenseUrl'    => [ 'type' => 'String' ],
+					'creditPageUrl' => [ 'type' => 'String' ],
+					'creditLine'    => [ 'type' => 'String' ],
+					'caption'       => [ 'type' => 'String' ],
+					'isAiGenerated' => [ 'type' => 'Boolean' ],
+				],
+			]
+		);
+
+		register_graphql_object_type(
 			'EatForeignDish',
 			[
 				'description' => 'EatForeign dish',
 				'fields'      => [
-					'id'                => [ 'type' => 'Int' ],
-					'slug'              => [ 'type' => 'String' ],
-					'title'             => [ 'type' => 'String' ],
-					'description'       => [ 'type' => 'String' ],
-					'originCountry'     => [ 'type' => 'String' ],
-					'countrySlug'       => [ 'type' => 'String' ],
-					'cuisineType'       => [ 'type' => 'String' ],
-					'dishType'          => [ 'type' => 'String' ],
-					'spiceLevel'        => [ 'type' => 'String' ],
-					'culturalMeaning'   => [ 'type' => 'String' ],
-					'averageRating'     => [ 'type' => 'Float' ],
-					'ingredients'       => [ 'type' => [ 'list_of' => 'String' ] ],
-					'gallery'           => [ 'type' => [ 'list_of' => 'String' ] ],
-					'heroImage'         => [ 'type' => 'String' ],
-					'celebrationSlugs'  => [ 'type' => [ 'list_of' => 'String' ] ],
+					'id'                       => [ 'type' => 'Int' ],
+					'slug'                     => [ 'type' => 'String' ],
+					'title'                    => [ 'type' => 'String' ],
+					'description'              => [ 'type' => 'String' ],
+					'originCountry'            => [ 'type' => 'String' ],
+					'countrySlug'              => [ 'type' => 'String' ],
+					'cuisineType'              => [ 'type' => 'String' ],
+					'dishType'                 => [ 'type' => 'String' ],
+					'spiceLevel'               => [ 'type' => 'String' ],
+					'culturalMeaning'          => [ 'type' => 'String' ],
+					'averageRating'            => [ 'type' => 'Float' ],
+					'ingredients'              => [ 'type' => [ 'list_of' => 'String' ] ],
+					'gallery'                  => [ 'type' => [ 'list_of' => 'String' ] ],
+					'heroImage'                => [ 'type' => 'String' ],
+					'featuredImageAttribution' => [ 'type' => 'EatForeignImageAttribution' ],
+					'imageAttributions'        => [ 'type' => [ 'list_of' => 'EatForeignImageAttribution' ] ],
+					'celebrationSlugs'         => [ 'type' => [ 'list_of' => 'String' ] ],
 				],
 			]
 		);

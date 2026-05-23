@@ -29,7 +29,11 @@ final class RestAPI {
 			wp_send_json_error( 'Missing dish post ID.' );
 		}
 
-		$result = OpenAIImageClient::generate_for_dish( $post_id );
+		$provider = sanitize_key( (string) wp_unslash( $_POST['provider'] ?? 'openai' ) );
+		$result   = match ( $provider ) {
+			'gemini' => GeminiImageClient::generate_for_dish( $post_id ),
+			default  => OpenAIImageClient::generate_for_dish( $post_id ),
+		};
 
 		if ( is_wp_error( $result ) ) {
 			wp_send_json_error( $result->get_error_message() );

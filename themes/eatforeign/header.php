@@ -8,9 +8,8 @@
 declare(strict_types=1);
 
 use EatForeignTheme\Helpers;
+use EatForeignTheme\Nav;
 
-$route    = Helpers::current_ef_route();
-$here     = is_front_page();
 $loc_val  = Helpers::header_location_value();
 $req_path = '/';
 if ( isset( $_SERVER['REQUEST_URI'] ) ) {
@@ -38,23 +37,7 @@ $redirect = esc_url_raw( $scheme . '://' . $host . $req_path );
 		<div class="ef-site-header__brand-row">
 			<a class="ef-brand" href="<?php echo esc_url( home_url( '/' ) ); ?>"><?php bloginfo( 'name' ); ?></a>
 			<nav class="ef-nav" aria-label="<?php esc_attr_e( 'Primary', 'eatforeign' ); ?>">
-				<ul class="ef-nav__list">
-					<li class="<?php echo $here ? 'is-active' : ''; ?>">
-						<a href="<?php echo esc_url( home_url( '/' ) ); ?>"><?php esc_html_e( 'Today', 'eatforeign' ); ?></a>
-					</li>
-					<li class="<?php echo $route === 'calendar' ? 'is-active' : ''; ?>">
-						<a href="<?php echo esc_url( home_url( '/calendar' ) ); ?>"><?php esc_html_e( 'Calendar', 'eatforeign' ); ?></a>
-					</li>
-					<li class="<?php echo $route === 'directory' ? 'is-active' : ''; ?>">
-						<a href="<?php echo esc_url( home_url( '/directory' ) ); ?>"><?php esc_html_e( 'Directory', 'eatforeign' ); ?></a>
-					</li>
-					<li class="<?php echo $route === 'passport' || $route === 'passport-detail' ? 'is-active' : ''; ?>">
-						<a href="<?php echo esc_url( home_url( '/passport' ) ); ?>"><?php esc_html_e( 'Passport', 'eatforeign' ); ?></a>
-					</li>
-					<li>
-						<a href="<?php echo esc_url( home_url( '/#explore-by-country' ) ); ?>"><?php esc_html_e( 'Explore', 'eatforeign' ); ?></a>
-					</li>
-				</ul>
+				<?php Nav::render_primary(); ?>
 			</nav>
 			<div class="ef-site-header__tools">
 				<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" class="ef-location-form">

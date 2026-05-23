@@ -11,6 +11,7 @@ namespace EatForeignTheme;
 
 final class Theme {
 	public static function init(): void {
+		Nav::register();
 		add_action( 'after_setup_theme', [ self::class, 'setup' ] );
 		add_action( 'wp_enqueue_scripts', [ self::class, 'enqueue_assets' ] );
 		add_action( 'wp_head', [ self::class, 'render_favicon' ], 5 );

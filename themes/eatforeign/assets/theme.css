@@ -125,6 +125,7 @@ img {
 }
 
 .ef-nav__list li.is-active a,
+.ef-nav__list li.current-menu-item a,
 .ef-nav__list a:hover {
   color: var(--ef-ink);
   border-bottom-color: var(--ef-accent);
@@ -301,6 +302,28 @@ img {
   border-bottom: 1px solid var(--ef-line);
 }
 
+.ef-section__header--with-cta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 1rem 1.5rem;
+}
+
+.ef-section__intro {
+  flex: 1 1 16rem;
+  min-width: 0;
+}
+
+.ef-section__cta-wrap {
+  margin: 0;
+  flex: 0 0 auto;
+}
+
+.ef-section__cta {
+  white-space: nowrap;
+}
+
 .ef-section__content {
   padding: 1.5rem;
 }
@@ -397,6 +420,22 @@ img {
   align-items: flex-start;
   justify-content: space-between;
   gap: 0.75rem;
+}
+
+.ef-card__title-row--country {
+  align-items: center;
+  justify-content: flex-start;
+  gap: 0.55rem;
+}
+
+.ef-card__country-flag {
+  font-size: 1.45rem;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.ef-card--country .ef-card__title {
+  margin: 0;
 }
 
 .ef-card__title {
@@ -864,6 +903,60 @@ img {
 .ef-directory-results__copy {
   margin: 0.35rem 0 0;
   color: var(--ef-muted);
+}
+
+.ef-pagination {
+  margin-top: 1.75rem;
+}
+
+.ef-pagination ul.page-numbers {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: none;
+}
+
+.ef-pagination a.page-numbers,
+.ef-pagination span.page-numbers {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 2.25rem;
+  min-height: 2.25rem;
+  padding: 0.35rem 0.65rem;
+  border: 1px solid var(--ef-line);
+  border-radius: 6px;
+  background: var(--ef-surface);
+  color: var(--ef-ink);
+  font-size: 0.9rem;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.ef-pagination a.page-numbers:hover {
+  border-color: var(--ef-accent);
+  color: var(--ef-accent);
+}
+
+.ef-pagination span.page-numbers.current {
+  background: var(--ef-accent);
+  border-color: var(--ef-accent);
+  color: #fff;
+}
+
+.ef-pagination span.page-numbers.dots {
+  border-color: transparent;
+  background: transparent;
+  pointer-events: none;
+}
+
+.ef-pagination ul.page-numbers li {
+  margin: 0;
+  padding: 0;
 }
 
 /* ——— Auth split ——— */
@@ -1344,6 +1437,21 @@ img {
   min-height: 18rem;
   max-height: 28rem;
   object-fit: cover;
+}
+
+.ef-dish-hero__caption {
+  margin: 0;
+  padding: 0.5rem 0.85rem;
+  font-size: 0.75rem;
+  line-height: 1.4;
+  color: var(--ef-muted, #646970);
+  background: var(--ef-canvas);
+  border-top: 1px solid var(--ef-line, #e2e4e7);
+}
+
+.ef-dish-hero__caption--ai {
+  font-weight: 600;
+  color: var(--ef-ink-muted, #50575e);
 }
 
 .ef-dish-hero__body {

@@ -194,8 +194,18 @@ final class CatalogRepository {
 	 * @return list<WP_Post>
 	 */
 	public static function filter_directory_dishes( array $filters ): array {
+		$result = self::filter_directory_dishes_paginated( $filters, 1, 100 );
+
+		return $result['posts'];
+	}
+
+	/**
+	 * @return array{posts: list<WP_Post>, total: int, max_pages: int, current_page: int, per_page: int}
+	 */
+	public static function filter_directory_dishes_paginated( array $filters, int $page = 1, int $per_page = 12 ): array {
 		$args = [
-			'posts_per_page' => 100,
+			'paged'          => max( 1, $page ),
+			'posts_per_page' => max( 1, $per_page ),
 			's'              => isset( $filters['query'] ) ? sanitize_text_field( (string) $filters['query'] ) : '',
 		];
 
@@ -229,7 +239,7 @@ final class CatalogRepository {
 			$args['tax_query'] = $tax_query;
 		}
 
-		return self::query_posts( PostType::DISH, $args );
+		return self::query_posts_paginated( PostType::DISH, $args );
 	}
 
 	/**
@@ -255,12 +265,30 @@ final class CatalogRepository {
 	 * @return list<WP_Post>
 	 */
 	public static function query_posts( string $post_type, array $args = [] ): array {
+		$result = self::query_posts_paginated( $post_type, $args );
+
+		return $result['posts'];
+	}
+
+	/**
+	 * @return array{posts: list<WP_Post>, total: int, max_pages: int, current_page: int, per_page: int}
+	 */
+	public static function query_posts_paginated( string $post_type, array $args = [] ): array {
+		$page     = max( 1, (int) ( $args['paged'] ?? 1 ) );
+		$per_page = (int) ( $args['posts_per_page'] ?? 20 );
+		if ( $per_page < 1 ) {
+			$per_page = 20;
+		}
+
+		unset( $args['paged'] );
+
 		$query = new WP_Query(
 			array_merge(
 				[
 					'post_type'      => $post_type,
 					'post_status'    => 'publish',
-					'posts_per_page' => 20,
+					'posts_per_page' => $per_page,
+					'paged'          => $page,
 					'orderby'        => 'title',
 					'order'          => 'ASC',
 				],
@@ -268,7 +296,13 @@ final class CatalogRepository {
 			)
 		);
 
-		return array_values( $query->posts );
+		return [
+			'posts'        => array_values( $query->posts ),
+			'total'        => (int) $query->found_posts,
+			'max_pages'    => (int) $query->max_num_pages,
+			'current_page' => $page,
+			'per_page'     => $per_page,
+		];
 	}
 
 	public static function format_post( WP_Post $post ): array {

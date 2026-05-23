@@ -12,6 +12,7 @@ if (! defined( 'ABSPATH' ) ) {
 }
 
 require_once get_template_directory() . '/inc/class-helpers.php';
+require_once get_template_directory() . '/inc/class-nav.php';
 require_once get_template_directory() . '/inc/class-theme.php';
 require_once get_template_directory() . '/inc/class-data.php';
 require_once get_template_directory() . '/inc/class-template.php';

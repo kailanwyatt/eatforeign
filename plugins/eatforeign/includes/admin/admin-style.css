@@ -7,6 +7,26 @@
 	width: 160px;
 }
 
+.ef-image-credit {
+	margin: 0 0 8px;
+	font-size: 11px;
+	line-height: 1.35;
+	color: #646970;
+}
+
+.ef-image-credit--ai {
+	font-weight: 600;
+	color: #50575e;
+}
+
+#ef-featured-attribution-preview.ef-image-credit--ai {
+	font-weight: 600;
+}
+
+.ef-attribution-fields--filled .widefat {
+	background: #f6f7f7;
+}
+
 .ef-image-lightbox-thumb {
 	max-width: 150px;
 	height: 100px;
@@ -110,6 +130,21 @@
 .ef-image-lightbox__prev.is-hidden,
 .ef-image-lightbox__next.is-hidden {
 	display: none;
+}
+
+.ef-image-lightbox__credit {
+	position: absolute;
+	bottom: 40px;
+	left: 50%;
+	transform: translateX(-50%);
+	z-index: 2;
+	max-width: min(90vw, 640px);
+	color: rgba(255, 255, 255, 0.9);
+	font-size: 13px;
+	line-height: 1.4;
+	margin: 0;
+	text-align: center;
+	pointer-events: none;
 }
 
 .ef-image-lightbox__hint {

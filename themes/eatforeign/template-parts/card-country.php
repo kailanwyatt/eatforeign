@@ -21,15 +21,22 @@ $image     = Data::post_image( $post );
 $overview  = (string) get_post_meta( $post->ID, 'ef_overview', true );
 $excerpt   = get_the_excerpt( $post );
 $copy      = Data::has_text( $overview ) ? $overview : $excerpt;
+$flag      = Data::country_flag( $post );
+$name      = Data::country_display_name( $post );
 
 ?>
-<article class="ef-card">
+<article class="ef-card ef-card--country">
 	<a class="ef-card__link" href="<?php echo esc_url( get_permalink( $post ) ); ?>">
 		<?php if ( $image !== '' ) : ?>
-			<img class="ef-card__image" src="<?php echo esc_url( $image ); ?>" alt="<?php echo esc_attr( get_the_title( $post ) ); ?>" loading="lazy" />
+			<img class="ef-card__image" src="<?php echo esc_url( $image ); ?>" alt="<?php echo esc_attr( $name ); ?>" loading="lazy" />
 		<?php endif; ?>
 		<div class="ef-card__body">
-			<h3 class="ef-card__title"><?php echo esc_html( get_the_title( $post ) ); ?></h3>
+			<div class="ef-card__title-row ef-card__title-row--country">
+				<?php if ( $flag !== '' ) : ?>
+					<span class="ef-card__country-flag" aria-hidden="true"><?php echo esc_html( $flag ); ?></span>
+				<?php endif; ?>
+				<h3 class="ef-card__title"><?php echo esc_html( $name ); ?></h3>
+			</div>
 			<?php if ( Data::has_text( $copy ) ) : ?>
 				<p class="ef-card__copy"><?php echo esc_html( $copy ); ?></p>
 			<?php endif; ?>

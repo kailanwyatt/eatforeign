@@ -12,17 +12,23 @@ use EatForeignTheme\Template;
 
 get_header();
 
-$dishes = Data::directory_dishes();
+$filters  = Data::directory_filters();
+$result   = Data::directory_dishes_paginated();
+$dishes   = $result['posts'];
+$total    = $result['total'];
+$max_pages = $result['max_pages'];
+$current_page = $result['current_page'];
+
 $cuis   = Data::terms_for_taxonomy( 'ef_cuisine' );
 $ctry   = Data::terms_for_taxonomy( 'ef_country' );
 $types  = Data::terms_for_taxonomy( 'ef_dish_type' );
 
-$q       = isset( $_GET['q'] ) ? sanitize_text_field( wp_unslash( (string) $_GET['q'] ) ) : '';
-$cur_c   = isset( $_GET['cuisine'] ) ? sanitize_text_field( wp_unslash( (string) $_GET['cuisine'] ) ) : '';
-$cur_cty = isset( $_GET['country'] ) ? sanitize_title( wp_unslash( (string) $_GET['country'] ) ) : '';
-$cur_typ = isset( $_GET['type'] ) ? sanitize_text_field( wp_unslash( (string) $_GET['type'] ) ) : '';
+$q       = $filters['query'];
+$cur_c   = $filters['cuisine'];
+$cur_cty = $filters['countrySlug'];
+$cur_typ = $filters['dishType'];
 
-$form_action = home_url( '/directory' );
+$form_action = Data::directory_url( 1, $filters );
 ?>
 <div class="ef-shell ef-stack">
 	<section class="ef-hero ef-hero--directory">
@@ -65,22 +71,25 @@ $form_action = home_url( '/directory' );
 				</div>
 				<div class="ef-pill-row" role="group" aria-label="<?php esc_attr_e( 'Dish type', 'eatforeign' ); ?>">
 					<?php
-					$carry = [];
-					if ( $q !== '' ) {
-						$carry['q'] = $q;
-					}
-					if ( $cur_c !== '' ) {
-						$carry['cuisine'] = $cur_c;
-					}
-					if ( $cur_cty !== '' ) {
-						$carry['country'] = $cur_cty;
-					}
-					$all_url = add_query_arg( $carry, $form_action );
+					$filter_carry = [
+						'query'       => $q,
+						'cuisine'     => $cur_c,
+						'countrySlug' => $cur_cty,
+					];
+					$all_url = Data::directory_url( 1, $filter_carry );
 					?>
 					<a class="ef-pill<?php echo $cur_typ === '' ? ' is-active' : ''; ?>" href="<?php echo esc_url( $all_url ); ?>"><?php esc_html_e( 'All types', 'eatforeign' ); ?></a>
 					<?php foreach ( $types as $term ) : ?>
 						<?php
-						$href = esc_url( add_query_arg( array_merge( $carry, [ 'type' => $term->name ] ), $form_action ) );
+						$href = esc_url(
+							Data::directory_url(
+								1,
+								array_merge(
+									$filter_carry,
+									[ 'dishType' => $term->name ]
+								)
+							)
+						);
 						?>
 						<a class="ef-pill<?php echo $cur_typ === $term->name ? ' is-active' : ''; ?>" href="<?php echo $href; ?>"><?php echo esc_html( $term->name ); ?></a>
 					<?php endforeach; ?>
@@ -97,11 +106,27 @@ $form_action = home_url( '/directory' );
 					<?php
 					echo esc_html(
 						sprintf(
-							/* translators: %d: number of dishes */
-							_n( '%d dish found', '%d dishes found', count( $dishes ), 'eatforeign' ),
-							count( $dishes )
+							/* translators: 1: result count, 2: current page, 3: total pages */
+							_n(
+								'%1$d dish found',
+								'%1$d dishes found',
+								$total,
+								'eatforeign'
+							),
+							$total
 						)
 					);
+					if ( $max_pages > 1 ) {
+						echo ' ';
+						echo esc_html(
+							sprintf(
+								/* translators: 1: current page number, 2: total pages */
+								__( '(page %1$d of %2$d)', 'eatforeign' ),
+								$current_page,
+								$max_pages
+							)
+						);
+					}
 					?>
 				</h2>
 				<p class="ef-directory-results__copy"><?php esc_html_e( 'Click a dish to mark your calendar, view the history, and find restaurants.', 'eatforeign' ); ?></p>
@@ -110,6 +135,7 @@ $form_action = home_url( '/directory' );
 				<p class="ef-muted"><?php esc_html_e( 'No dishes match those filters yet.', 'eatforeign' ); ?></p>
 			<?php else : ?>
 				<?php Template::dish_directory_grid( $dishes ); ?>
+				<?php Template::directory_pagination( $current_page, $max_pages, $filters ); ?>
 			<?php endif; ?>
 		</section>
 	<?php endif; ?>

@@ -38,6 +38,14 @@ final class Settings {
 		);
 		register_setting( 'eatforeign_api_settings', 'eatforeign_openai_image_size' );
 		register_setting( 'eatforeign_api_settings', 'eatforeign_openai_daily_limit' );
+		register_setting(
+			'eatforeign_api_settings',
+			'eatforeign_gemini_image_model',
+			[
+				'sanitize_callback' => [ self::class, 'sanitize_gemini_image_model' ],
+			]
+		);
+		register_setting( 'eatforeign_api_settings', 'eatforeign_gemini_image_daily_limit' );
 		register_setting( 'eatforeign_api_settings', 'eatforeign_google_places_api_key' );
 		register_setting( 'eatforeign_api_settings', 'eatforeign_places_daily_limit' );
 		register_setting( 'eatforeign_api_settings', 'eatforeign_source_urls' );
@@ -91,6 +99,22 @@ final class Settings {
 		);
 
 		add_settings_field(
+			'eatforeign_gemini_image_model',
+			'Gemini Image Model',
+			[ self::class, 'render_gemini_image_model_field' ],
+			'eatforeign-api',
+			'eatforeign_api_section_keys'
+		);
+
+		add_settings_field(
+			'eatforeign_gemini_image_daily_limit',
+			'Max Daily Gemini Image Generations',
+			[ self::class, 'render_gemini_image_limit_field' ],
+			'eatforeign-api',
+			'eatforeign_api_section_keys'
+		);
+
+		add_settings_field(
 			'eatforeign_google_places_api_key',
 			'Google Places API Key',
 			[ self::class, 'render_places_key_field' ],
@@ -133,6 +157,7 @@ final class Settings {
 	public static function render_ai_key_field(): void {
 		$key = get_option( 'eatforeign_ai_api_key', '' );
 		echo '<input type="password" name="eatforeign_ai_api_key" value="' . esc_attr( $key ) . '" class="regular-text" />';
+		echo '<p class="description">Used for content generation, scraping, and <strong>Gemini dish photos</strong> in the dish editor. Image generation requires a model that supports image output (see Gemini Image Model below).</p>';
 	}
 
 	public static function render_openai_key_field(): void {
@@ -176,7 +201,31 @@ final class Settings {
 	public static function render_openai_limit_field(): void {
 		$limit = get_option( 'eatforeign_openai_daily_limit', '10' );
 		echo '<input type="number" name="eatforeign_openai_daily_limit" value="' . esc_attr( (string) $limit ) . '" class="small-text" min="0" />';
-		echo '<p class="description">Manual generations per day from the dish editor (0 for no limit).</p>';
+		echo '<p class="description">OpenAI manual generations per day from the dish editor (0 for no limit).</p>';
+	}
+
+	public static function sanitize_gemini_image_model( mixed $value ): string {
+		return GeminiImageClient::resolve_model( is_string( $value ) ? $value : '' );
+	}
+
+	public static function render_gemini_image_model_field(): void {
+		$model = GeminiImageClient::resolve_model( (string) get_option( 'eatforeign_gemini_image_model', 'gemini-2.5-flash-image' ) );
+		echo '<select name="eatforeign_gemini_image_model">';
+		foreach ( [ 'gemini-2.5-flash-image', 'gemini-2.0-flash-preview-image-generation' ] as $option ) {
+			printf(
+				'<option value="%1$s" %2$s>%1$s</option>',
+				esc_attr( $option ),
+				selected( $model, $option, false )
+			);
+		}
+		echo '</select>';
+		echo '<p class="description">Uses the same Gemini API key as above. Requires a Google AI model with image output enabled on your key.</p>';
+	}
+
+	public static function render_gemini_image_limit_field(): void {
+		$limit = get_option( 'eatforeign_gemini_image_daily_limit', '10' );
+		echo '<input type="number" name="eatforeign_gemini_image_daily_limit" value="' . esc_attr( (string) $limit ) . '" class="small-text" min="0" />';
+		echo '<p class="description">Gemini manual generations per day from the dish editor (0 for no limit).</p>';
 	}
 
 	public static function render_places_key_field(): void {

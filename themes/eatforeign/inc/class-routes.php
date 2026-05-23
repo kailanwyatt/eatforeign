@@ -12,7 +12,7 @@ namespace EatForeignTheme;
 final class Routes {
 	private const QUERY_VAR = 'ef_page';
 
-	private const REWRITE_VERSION = '3';
+	private const REWRITE_VERSION = '5';
 
 	/** @var list<string> */
 	private const STATIC_ROUTES = [
@@ -22,6 +22,7 @@ final class Routes {
 		'passport',
 		'calendar',
 		'directory',
+		'countries',
 	];
 
 	public static function init(): void {
@@ -46,6 +47,11 @@ final class Routes {
 		);
 
 		foreach ( self::STATIC_ROUTES as $route ) {
+			add_rewrite_rule(
+				'^' . $route . '/page/([0-9]{1,})/?$',
+				'index.php?' . self::QUERY_VAR . '=' . $route . '&paged=$matches[1]',
+				'top'
+			);
 			add_rewrite_rule(
 				'^' . $route . '/?$',
 				'index.php?' . self::QUERY_VAR . '=' . $route,
@@ -86,6 +92,7 @@ final class Routes {
 			'passport-detail' => 'page-passport-detail.php',
 			'calendar'        => 'page-calendar.php',
 			'directory'       => 'page-directory.php',
+			'countries'       => 'page-countries.php',
 		];
 
 		if (! isset( $map[ $page ] ) ) {

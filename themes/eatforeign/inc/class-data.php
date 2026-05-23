@@ -12,6 +12,7 @@ namespace EatForeignTheme;
 use EatForeign\Repositories\CatalogRepository;
 use EatForeign\Repositories\CommunityRepository;
 use EatForeign\Repositories\PassportRepository;
+use EatForeign\Support\ImageAttribution;
 use EatForeign\Support\PostType;
 use WP_Post;
 use WP_Query;
@@ -33,22 +34,69 @@ final class Data {
 		return self::plugin_ready() ? CatalogRepository::get_celebration_flag_emoji( $post->ID ) : '';
 	}
 
+	public const DIRECTORY_PER_PAGE = 12;
+
 	/**
-	 * @return list<WP_Post>
+	 * @return array{query: string, cuisine: string, countrySlug: string, dishType: string}
 	 */
-	public static function directory_dishes(): array {
-		if (! self::plugin_ready() ) {
-			return [];
+	public static function directory_filters(): array {
+		return [
+			'query'       => isset( $_GET['q'] ) ? sanitize_text_field( wp_unslash( (string) $_GET['q'] ) ) : '',
+			'cuisine'     => isset( $_GET['cuisine'] ) ? sanitize_text_field( wp_unslash( (string) $_GET['cuisine'] ) ) : '',
+			'countrySlug' => isset( $_GET['country'] ) ? sanitize_title( wp_unslash( (string) $_GET['country'] ) ) : '',
+			'dishType'    => isset( $_GET['type'] ) ? sanitize_text_field( wp_unslash( (string) $_GET['type'] ) ) : '',
+		];
+	}
+
+	public static function directory_page_number(): int {
+		$paged = (int) get_query_var( 'paged' );
+
+		if ( $paged > 0 ) {
+			return $paged;
 		}
 
-		return CatalogRepository::filter_directory_dishes(
-			[
-				'query'        => isset( $_GET['q'] ) ? sanitize_text_field( wp_unslash( (string) $_GET['q'] ) ) : '',
-				'cuisine'      => isset( $_GET['cuisine'] ) ? sanitize_text_field( wp_unslash( (string) $_GET['cuisine'] ) ) : '',
-				'countrySlug'  => isset( $_GET['country'] ) ? sanitize_title( wp_unslash( (string) $_GET['country'] ) ) : '',
-				'dishType'     => isset( $_GET['type'] ) ? sanitize_text_field( wp_unslash( (string) $_GET['type'] ) ) : '',
-			]
+		return max( 1, (int) ( $_GET['paged'] ?? 1 ) );
+	}
+
+	/**
+	 * @return array{posts: list<\WP_Post>, total: int, max_pages: int, current_page: int, per_page: int}
+	 */
+	public static function directory_dishes_paginated(): array {
+		if (! self::plugin_ready() ) {
+			return [
+				'posts'        => [],
+				'total'        => 0,
+				'max_pages'    => 0,
+				'current_page' => 1,
+				'per_page'     => self::DIRECTORY_PER_PAGE,
+			];
+		}
+
+		return CatalogRepository::filter_directory_dishes_paginated(
+			self::directory_filters(),
+			self::directory_page_number(),
+			self::DIRECTORY_PER_PAGE
 		);
+	}
+
+	/**
+	 * @param array{query?: string, cuisine?: string, countrySlug?: string, dishType?: string} $filters
+	 */
+	public static function directory_url( int $page = 1, array $filters = [] ): string {
+		$page = max( 1, $page );
+		$path = $page > 1 ? home_url( '/directory/page/' . $page . '/' ) : home_url( '/directory/' );
+
+		$query = array_filter(
+			[
+				'q'       => $filters['query'] ?? '',
+				'cuisine' => $filters['cuisine'] ?? '',
+				'country' => $filters['countrySlug'] ?? '',
+				'type'    => $filters['dishType'] ?? '',
+			],
+			static fn( string $value ): bool => $value !== ''
+		);
+
+		return $query !== [] ? (string) add_query_arg( $query, $path ) : $path;
 	}
 
 	/**
@@ -127,9 +175,11 @@ final class Data {
 	}
 
 	/**
+	 * Random subset for the home page "Explore by Country" section.
+	 *
 	 * @return list<WP_Post>
 	 */
-	public static function countries( int $limit = 6 ): array {
+	public static function explore_countries( int $limit = 6 ): array {
 		if (! self::plugin_ready() ) {
 			return [];
 		}
@@ -138,8 +188,49 @@ final class Data {
 			PostType::COUNTRY,
 			[
 				'posts_per_page' => $limit,
+				'orderby'        => 'rand',
 			]
 		);
+	}
+
+	/**
+	 * @return list<WP_Post>
+	 */
+	public static function all_countries(): array {
+		if (! self::plugin_ready() ) {
+			return [];
+		}
+
+		return CatalogRepository::query_posts(
+			PostType::COUNTRY,
+			[
+				'posts_per_page' => -1,
+				'orderby'        => 'title',
+				'order'          => 'ASC',
+			]
+		);
+	}
+
+	public static function countries_archive_url(): string {
+		return home_url( '/countries' );
+	}
+
+	public static function country_flag( WP_Post $post ): string {
+		return self::flag_for_country_post( $post );
+	}
+
+	/**
+	 * Strip a leading flag emoji from a country title when the name is shown beside a flag.
+	 */
+	public static function country_display_name( WP_Post $post ): string {
+		$title = get_the_title( $post );
+		$flag  = self::country_flag( $post );
+
+		if ( $flag !== '' && str_starts_with( $title, $flag ) ) {
+			return trim( substr( $title, strlen( $flag ) ) );
+		}
+
+		return $title;
 	}
 
 	/**
@@ -209,6 +300,35 @@ final class Data {
 		$image_url = get_post_meta( $post->ID, 'ef_image_url', true );
 
 		return is_string( $image_url ) ? $image_url : '';
+	}
+
+	/**
+	 * @return array<string, string>|null
+	 */
+	public static function dish_featured_attribution( int $dish_id ): ?array {
+		if (! class_exists( ImageAttribution::class ) ) {
+			return null;
+		}
+
+		return ImageAttribution::resolve_featured_for_post( $dish_id );
+	}
+
+	public static function dish_image_caption( int $dish_id ): string {
+		$attribution = self::dish_featured_attribution( $dish_id );
+
+		if ( $attribution === null || ! class_exists( ImageAttribution::class ) ) {
+			return '';
+		}
+
+		return ImageAttribution::display_caption( $attribution );
+	}
+
+	public static function dish_image_is_ai_generated( int $dish_id ): bool {
+		$attribution = self::dish_featured_attribution( $dish_id );
+
+		return $attribution !== null
+			&& class_exists( ImageAttribution::class )
+			&& ImageAttribution::is_ai_generated( $attribution );
 	}
 
 	/**

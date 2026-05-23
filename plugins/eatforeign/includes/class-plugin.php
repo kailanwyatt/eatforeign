@@ -70,6 +70,7 @@ final class Plugin {
 		require_once EATFOREIGN_PLUGIN_DIR . 'includes/repositories/class-passport-repository.php';
 		require_once EATFOREIGN_PLUGIN_DIR . 'includes/support/class-post-type.php';
 		require_once EATFOREIGN_PLUGIN_DIR . 'includes/support/class-sanitizer.php';
+		require_once EATFOREIGN_PLUGIN_DIR . 'includes/support/class-image-attribution.php';
 		require_once EATFOREIGN_PLUGIN_DIR . 'includes/support/class-capabilities.php';
 		require_once EATFOREIGN_PLUGIN_DIR . 'includes/support/class-auth-token.php';
 		require_once EATFOREIGN_PLUGIN_DIR . 'includes/support/class-notifications.php';

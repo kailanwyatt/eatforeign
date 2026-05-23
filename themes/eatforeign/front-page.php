@@ -60,10 +60,12 @@ get_header();
 		);
 		Template::section(
 			__( 'Explore by Country', 'eatforeign' ),
-			Data::countries(),
+			Data::explore_countries(),
 			'country',
 			__( 'Jump into national dishes, holidays, and restaurant picks.', 'eatforeign' ),
-			'explore-by-country'
+			'explore-by-country',
+			Data::countries_archive_url(),
+			__( 'View all countries', 'eatforeign' )
 		);
 		Template::section(
 			__( 'Upcoming Food Holidays', 'eatforeign' ),

@@ -10,6 +10,7 @@ declare(strict_types=1);
 namespace EatForeign\Admin;
 
 use EatForeign\Repositories\ModerationRepository;
+use EatForeign\Support\ImageAttribution;
 use EatForeign\Support\PostType;
 
 final class Admin {
@@ -28,6 +29,8 @@ final class Admin {
 		// AJAX and Scripts
 		add_action('admin_enqueue_scripts', [ self::class, 'enqueue_scripts' ] );
 		add_action('wp_ajax_eatforeign_sideload_image', [ self::class, 'ajax_sideload_image' ] );
+		add_action('wp_ajax_eatforeign_get_featured_attribution', [ self::class, 'ajax_get_featured_attribution' ] );
+		add_action( 'set_post_thumbnail', [ self::class, 'sync_featured_attribution_from_thumbnail' ], 10, 2 );
 
 		add_action('admin_menu', [ self::class, 'register_tools_page' ] );
 		add_action('admin_post_ef_remove_imported_mock_data', [ self::class, 'handle_remove_imported_mock_data' ] );
@@ -62,14 +65,16 @@ final class Admin {
 		wp_enqueue_script(
 			'eatforeign-admin-script',
 			plugins_url( 'admin-script.js', __FILE__ ),
-			[ 'jquery' ],
-			'1.1.0',
+			[ 'jquery', 'media-editor' ],
+			'1.3.0',
 			true
 		);
 
 		wp_localize_script( 'eatforeign-admin-script', 'eatforeign_admin', [
 			'nonce'          => wp_create_nonce( 'eatforeign_sideload' ),
 			'generate_nonce' => wp_create_nonce( 'eatforeign_generate_dish_image' ),
+			'has_openai_key' => (string) get_option( 'eatforeign_openai_api_key', '' ) !== '',
+			'has_gemini_key' => (string) get_option( 'eatforeign_ai_api_key', '' ) !== '',
 		] );
 	}
 
@@ -101,12 +106,153 @@ final class Admin {
 
 		set_post_thumbnail( $post_id, $attachment_id );
 
+		$attribution = self::resolve_attribution_for_sideload( $post_id, $image_url );
+		if ( $attribution !== null ) {
+			update_post_meta( $post_id, 'ef_featured_image_attribution', $attribution );
+			update_post_meta( $attachment_id, '_ef_image_attribution', $attribution );
+		}
+
 		$thumbnail_html = _wp_post_thumbnail_html( $attachment_id, $post_id );
 
-		wp_send_json_success( [
-			'attachment_id'  => $attachment_id,
-			'thumbnail_html' => $thumbnail_html,
-		] );
+		wp_send_json_success(
+			array_merge(
+				[
+					'attachment_id'  => $attachment_id,
+					'thumbnail_html' => $thumbnail_html,
+				],
+				self::attribution_json_payload( $attribution )
+			)
+		);
+	}
+
+	public static function ajax_get_featured_attribution(): void {
+		if ( ! isset( $_POST['nonce'] ) || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['nonce'] ) ), 'eatforeign_sideload' ) ) {
+			wp_send_json_error( 'Invalid nonce' );
+		}
+
+		if ( ! current_user_can( 'edit_posts' ) ) {
+			wp_send_json_error( 'Unauthorized' );
+		}
+
+		$post_id       = (int) ( $_POST['post_id'] ?? 0 );
+		$attachment_id = (int) ( $_POST['attachment_id'] ?? 0 );
+
+		if ( $post_id <= 0 || $attachment_id <= 0 ) {
+			wp_send_json_error( 'Missing parameters' );
+		}
+
+		if ( ! current_user_can( 'edit_post', $post_id ) ) {
+			wp_send_json_error( 'Unauthorized' );
+		}
+
+		$attribution = self::resolve_attribution_for_attachment( $post_id, $attachment_id );
+		if ( $attribution !== null ) {
+			update_post_meta( $post_id, 'ef_featured_image_attribution', $attribution );
+		}
+
+		wp_send_json_success( self::attribution_json_payload( $attribution ) );
+	}
+
+	public static function sync_featured_attribution_from_thumbnail( int $post_id, int $thumbnail_id ): void {
+		if ( get_post_type( $post_id ) !== PostType::DISH || $thumbnail_id <= 0 ) {
+			return;
+		}
+
+		$attribution = self::resolve_attribution_for_attachment( $post_id, $thumbnail_id );
+		if ( $attribution === null ) {
+			return;
+		}
+
+		update_post_meta( $post_id, 'ef_featured_image_attribution', $attribution );
+		update_post_meta( $thumbnail_id, '_ef_image_attribution', $attribution );
+	}
+
+	/**
+	 * @return array<string, mixed>
+	 */
+	private static function attribution_json_payload( ?array $attribution ): array {
+		if ( $attribution === null || $attribution === [] ) {
+			return [
+				'attribution'   => null,
+				'creditLine'    => '',
+				'caption'       => '',
+				'isAiGenerated' => false,
+			];
+		}
+
+		return [
+			'attribution'   => $attribution,
+			'creditLine'    => ImageAttribution::format_credit_line( $attribution ),
+			'caption'       => ImageAttribution::display_caption( $attribution ),
+			'isAiGenerated' => ImageAttribution::is_ai_generated( $attribution ),
+		];
+	}
+
+	/**
+	 * @return array<string, string>|null
+	 */
+	private static function resolve_attribution_for_attachment( int $post_id, int $attachment_id ): ?array {
+		$stored = ImageAttribution::normalize_record( get_post_meta( $attachment_id, '_ef_image_attribution', true ) );
+		if ( $stored !== [] ) {
+			return $stored;
+		}
+
+		$image_url = (string) wp_get_attachment_url( $attachment_id );
+		if ( $image_url === '' ) {
+			return null;
+		}
+
+		return self::resolve_attribution_for_url( $post_id, $image_url );
+	}
+
+	/**
+	 * @return array<string, string>|null
+	 */
+	private static function resolve_attribution_for_url( int $post_id, string $image_url ): ?array {
+		$sources = ImageAttribution::merge_legacy_suggested_urls(
+			get_post_meta( $post_id, 'ef_suggested_image_sources', true ),
+			get_post_meta( $post_id, 'ef_suggested_images', true )
+		);
+		$match   = ImageAttribution::find_by_url( $sources, $image_url );
+		if ( $match !== null ) {
+			return $match;
+		}
+
+		$ai_images = get_post_meta( $post_id, 'ef_ai_generated_images', true );
+		if ( is_array( $ai_images ) && in_array( $image_url, $ai_images, true ) ) {
+			return ImageAttribution::ai_generated_record( $image_url );
+		}
+
+		return null;
+	}
+
+	/**
+	 * @return array<string, string>|null
+	 */
+	private static function resolve_attribution_for_sideload( int $post_id, string $image_url ): ?array {
+		$posted = isset( $_POST['attribution'] ) ? wp_unslash( $_POST['attribution'] ) : '';
+		if ( is_string( $posted ) && $posted !== '' ) {
+			$decoded = json_decode( $posted, true );
+			if ( is_array( $decoded ) ) {
+				$record = ImageAttribution::normalize_record( $decoded );
+				if ( $record !== [] ) {
+					return $record;
+				}
+			}
+		}
+
+		$resolved = self::resolve_attribution_for_url( $post_id, $image_url );
+		if ( $resolved !== null ) {
+			return $resolved;
+		}
+
+		return ImageAttribution::normalize_record(
+			[
+				'url'        => $image_url,
+				'sourceType' => ImageAttribution::TYPE_REMOTE,
+				'sourceName' => 'Remote image',
+			]
+		);
 	}
 
 	public static function register_meta_boxes(): void {
@@ -166,33 +312,84 @@ final class Admin {
 		self::text_field( 'ef_gallery_urls', 'Gallery URLs (comma separated)', implode( ',', (array) get_post_meta( $post->ID, 'ef_gallery_urls', true ) ) );
 		self::text_field( 'ef_celebration_ids', 'Celebration IDs (comma separated)', implode( ',', array_map( 'strval', (array) get_post_meta( $post->ID, 'ef_celebration_ids', true ) ) ) );
 
-		echo '<hr><p><strong>AI-Generated Photos (OpenAI)</strong></p>';
-		echo '<p class="description">Generate a photorealistic dish photo, then set it as the featured image. Click any thumbnail to preview full size. Requires OpenAI API key in Settings → EatForeign API.</p>';
+		$has_openai = (string) get_option( 'eatforeign_openai_api_key', '' ) !== '';
+		$has_gemini = (string) get_option( 'eatforeign_ai_api_key', '' ) !== '';
+
+		echo '<hr><p><strong>AI-generated photos</strong></p>';
+		echo '<p class="description">Generate a photorealistic dish photo with OpenAI or Gemini, then set it as the featured image. Configure API keys under Settings → EatForeign API.</p>';
 		echo '<p style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;">';
-		echo '<button type="button" class="button button-secondary" id="ef-generate-ai-image" data-post-id="' . esc_attr( (string) $post->ID ) . '">Generate AI photo</button>';
+		printf(
+			'<button type="button" class="button button-secondary ef-generate-dish-image" data-provider="openai" data-post-id="%1$s" %2$s>Generate with OpenAI</button>',
+			esc_attr( (string) $post->ID ),
+			$has_openai ? '' : 'disabled title="Add OpenAI API key in EatForeign API settings"'
+		);
+		printf(
+			'<button type="button" class="button button-secondary ef-generate-dish-image" data-provider="gemini" data-post-id="%1$s" %2$s>Generate with Gemini</button>',
+			esc_attr( (string) $post->ID ),
+			$has_gemini ? '' : 'disabled title="Add Gemini API key in EatForeign API settings"'
+		);
 		echo '<a href="' . esc_url( self::google_images_url_for_dish( $post ) ) . '" target="_blank" rel="noopener noreferrer" class="button button-link">Compare on Google Images</a>';
 		echo '</p>';
 		echo '<p id="ef-ai-generate-status" style="margin:8px 0;font-weight:600;"></p>';
+
+		$sources_by_url = [];
+		foreach ( ImageAttribution::get_suggested_sources( get_post_meta( $post->ID, 'ef_suggested_image_sources', true ) ) as $source ) {
+			$sources_by_url[ $source['url'] ] = $source;
+		}
 
 		$ai_images = get_post_meta( $post->ID, 'ef_ai_generated_images', true );
 		echo '<div id="ef-ai-images-grid" style="display:flex;gap:15px;flex-wrap:wrap;margin-top:10px;">';
 		if ( ! empty( $ai_images ) && is_array( $ai_images ) ) {
 			foreach ( $ai_images as $url ) {
-				self::render_image_sideload_card( (string) $url, $post->ID );
+				$url = (string) $url;
+				self::render_image_sideload_card(
+					$url,
+					$post->ID,
+					$sources_by_url[ $url ] ?? ImageAttribution::ai_generated_record( $url )
+				);
 			}
 		}
 		echo '</div>';
 
-		$suggested_images = get_post_meta( $post->ID, 'ef_suggested_images', true );
-		if ( ! empty( $suggested_images ) && is_array( $suggested_images ) ) {
+		$suggested_sources = ImageAttribution::merge_legacy_suggested_urls(
+			get_post_meta( $post->ID, 'ef_suggested_image_sources', true ),
+			get_post_meta( $post->ID, 'ef_suggested_images', true )
+		);
+		$wikimedia_sources = array_values(
+			array_filter(
+				$suggested_sources,
+				static fn( array $source ): bool => ( $source['sourceType'] ?? '' ) === ImageAttribution::TYPE_WIKIMEDIA
+			)
+		);
+
+		if ( $wikimedia_sources !== [] ) {
 			echo '<hr><p><strong>Suggested Images from Wikimedia</strong></p>';
-			echo '<p class="description">Click a thumbnail to preview full size. Use “Set as Featured” to sideload and assign.</p>';
+			echo '<p class="description">Attribution is stored when you set a photo as featured. Required for license compliance on remote images.</p>';
 			echo '<div class="ef-suggested-images-grid" style="display:flex;gap:15px;flex-wrap:wrap;margin-top:10px;">';
-			foreach ( $suggested_images as $url ) {
-				self::render_image_sideload_card( (string) $url, $post->ID );
+			foreach ( $wikimedia_sources as $source ) {
+				self::render_image_sideload_card( $source['url'], $post->ID, $source );
 			}
-			echo '</div><hr>';
+			echo '</div>';
 		}
+
+		$featured = ImageAttribution::resolve_featured_for_post( $post->ID );
+		echo '<hr><p><strong>Featured image attribution</strong></p>';
+		echo '<p id="ef-featured-attribution-preview" class="description" style="margin-bottom:8px;' . ( $featured === null ? ' display:none;' : '' ) . '">';
+		if ( $featured !== null ) {
+			echo esc_html( ImageAttribution::display_caption( $featured ) );
+		}
+		echo '</p>';
+		$has_source_link = is_array( $featured ) && ! empty( $featured['creditPageUrl'] );
+		echo '<p id="ef-featured-attribution-source-wrap" style="margin-bottom:8px;' . ( $has_source_link ? '' : ' display:none;' ) . '">';
+		echo '<a id="ef-featured-attribution-source-link" href="' . esc_url( $has_source_link ? (string) $featured['creditPageUrl'] : '' ) . '" target="_blank" rel="noopener noreferrer">';
+		esc_html_e( 'View source page', 'eatforeign' );
+		echo '</a></p>';
+		if ( $featured === null ) {
+			echo '<p id="ef-featured-attribution-empty" class="description">Set a featured image from the suggestions above to fill in photo credit automatically.</p>';
+		}
+		echo '<div id="ef-featured-attribution-fields">';
+		self::attribution_fields( 'ef_featured_image_attribution', $featured ?? [] );
+		echo '</div>';
 	}
 
 	public static function google_images_url_for_dish( \WP_Post $post ): string {
@@ -208,11 +405,33 @@ final class Admin {
 		return 'https://www.google.com/search?tbm=isch&q=' . rawurlencode( $query );
 	}
 
-	private static function render_image_sideload_card( string $url, int $post_id ): void {
+	/**
+	 * @param array<string, string> $attribution
+	 */
+	private static function render_image_sideload_card( string $url, int $post_id, array $attribution = [] ): void {
+		$credit           = $attribution !== [] ? ImageAttribution::display_caption( $attribution ) : '';
+		$is_ai            = $attribution !== [] && ImageAttribution::is_ai_generated( $attribution );
+		$attribution_json = $attribution !== [] ? wp_json_encode( $attribution ) : '';
+
 		echo '<div class="ef-image-sideload-card">';
 		echo '<img class="ef-image-lightbox-thumb" src="' . esc_url( $url ) . '" data-full-url="' . esc_attr( $url ) . '" alt="' . esc_attr__( 'Click to preview', 'eatforeign' ) . '" title="' . esc_attr__( 'Click to preview', 'eatforeign' ) . '" />';
-		echo '<button type="button" class="button ef-sideload-btn" data-url="' . esc_attr( $url ) . '" data-post-id="' . esc_attr( (string) $post_id ) . '">Set as Featured</button>';
+		if ( $credit !== '' ) {
+			$credit_class = 'ef-image-credit description' . ( $is_ai ? ' ef-image-credit--ai' : '' );
+			echo '<p class="' . esc_attr( $credit_class ) . '">' . esc_html( $credit ) . '</p>';
+		}
+		echo '<button type="button" class="button ef-sideload-btn" data-url="' . esc_attr( $url ) . '" data-post-id="' . esc_attr( (string) $post_id ) . '" data-attribution="' . esc_attr( (string) $attribution_json ) . '">Set as Featured</button>';
 		echo '</div>';
+	}
+
+	/**
+	 * @param array<string, string> $values
+	 */
+	private static function attribution_fields( string $prefix, array $values ): void {
+		self::text_field( $prefix . '_source_name', 'Source name', (string) ( $values['sourceName'] ?? '' ) );
+		self::text_field( $prefix . '_author', 'Author / creator', (string) ( $values['author'] ?? '' ) );
+		self::text_field( $prefix . '_license', 'License', (string) ( $values['license'] ?? '' ) );
+		self::text_field( $prefix . '_license_url', 'License URL', (string) ( $values['licenseUrl'] ?? '' ) );
+		self::text_field( $prefix . '_credit_page_url', 'Credit / source page URL', (string) ( $values['creditPageUrl'] ?? '' ) );
 	}
 
 	public static function render_country_meta_box( \WP_Post $post ): void {
@@ -252,11 +471,54 @@ final class Admin {
 
 		$fields = array_keys( $_POST );
 		foreach ( $fields as $field ) {
-			if ( str_starts_with( $field, 'ef_' ) ) {
-				$value = wp_unslash( $_POST[ $field ] );
-				update_post_meta( $post_id, $field, is_array( $value ) ? $value : sanitize_text_field( (string) $value ) );
+			if ( ! str_starts_with( $field, 'ef_' ) || str_starts_with( $field, 'ef_featured_image_attribution_' ) ) {
+				continue;
+			}
+
+			$value = wp_unslash( $_POST[ $field ] );
+			update_post_meta( $post_id, $field, is_array( $value ) ? $value : sanitize_text_field( (string) $value ) );
+		}
+
+		if ( get_post_type( $post_id ) === PostType::DISH ) {
+			self::save_featured_attribution_from_post( $post_id );
+		}
+	}
+
+	private static function save_featured_attribution_from_post( int $post_id ): void {
+		$has_input = false;
+		foreach ( [ 'source_name', 'author', 'license', 'license_url', 'credit_page_url' ] as $suffix ) {
+			$key = 'ef_featured_image_attribution_' . $suffix;
+			if ( isset( $_POST[ $key ] ) && trim( (string) wp_unslash( $_POST[ $key ] ) ) !== '' ) {
+				$has_input = true;
+				break;
 			}
 		}
+
+		$existing = ImageAttribution::get_featured_attribution( get_post_meta( $post_id, 'ef_featured_image_attribution', true ) );
+		$image_url = (string) ( get_the_post_thumbnail_url( $post_id, 'full' ) ?: ( $existing['url'] ?? '' ) );
+
+		if ( ! $has_input && $existing === null ) {
+			return;
+		}
+
+		$record = ImageAttribution::normalize_record(
+			[
+				'url'           => $image_url,
+				'sourceType'    => $existing['sourceType'] ?? ImageAttribution::TYPE_MANUAL,
+				'sourceName'    => sanitize_text_field( (string) wp_unslash( $_POST['ef_featured_image_attribution_source_name'] ?? '' ) ),
+				'author'        => sanitize_text_field( (string) wp_unslash( $_POST['ef_featured_image_attribution_author'] ?? '' ) ),
+				'license'       => sanitize_text_field( (string) wp_unslash( $_POST['ef_featured_image_attribution_license'] ?? '' ) ),
+				'licenseUrl'    => esc_url_raw( (string) wp_unslash( $_POST['ef_featured_image_attribution_license_url'] ?? '' ) ),
+				'creditPageUrl' => esc_url_raw( (string) wp_unslash( $_POST['ef_featured_image_attribution_credit_page_url'] ?? '' ) ),
+			]
+		);
+
+		if ( $record === [] ) {
+			delete_post_meta( $post_id, 'ef_featured_image_attribution' );
+			return;
+		}
+
+		update_post_meta( $post_id, 'ef_featured_image_attribution', $record );
 	}
 
 	/**

@@ -15,7 +15,15 @@ final class Template {
 	/**
 	 * @param list<WP_Post> $posts
 	 */
-	public static function section( string $title, array $posts, string $card, ?string $description = null, ?string $anchor_id = null ): void {
+	public static function section(
+		string $title,
+		array $posts,
+		string $card,
+		?string $description = null,
+		?string $anchor_id = null,
+		?string $cta_url = null,
+		?string $cta_label = null
+	): void {
 		if ( $posts === [] ) {
 			return;
 		}
@@ -36,6 +44,8 @@ final class Template {
 				'description' => $description,
 				'content'     => $content,
 				'anchor_id'   => $anchor_id,
+				'cta_url'     => $cta_url,
+				'cta_label'   => $cta_label,
 			]
 		);
 	}
@@ -72,6 +82,50 @@ final class Template {
 		}
 
 		echo '</div>';
+	}
+
+	/**
+	 * @param array{query?: string, cuisine?: string, countrySlug?: string, dishType?: string} $filters
+	 */
+	public static function directory_pagination(
+		int $current_page,
+		int $max_pages,
+		array $filters = []
+	): void {
+		if ( $max_pages <= 1 ) {
+			return;
+		}
+
+		$add_args = array_filter(
+			[
+				'q'       => $filters['query'] ?? '',
+				'cuisine' => $filters['cuisine'] ?? '',
+				'country' => $filters['countrySlug'] ?? '',
+				'type'    => $filters['dishType'] ?? '',
+			],
+			static fn( string $value ): bool => $value !== ''
+		);
+
+		$links = paginate_links(
+			[
+				'base'      => esc_url( trailingslashit( home_url( '/directory' ) ) ) . '%_%',
+				'format'    => 'page/%#%/',
+				'current'   => max( 1, $current_page ),
+				'total'     => $max_pages,
+				'prev_text' => __( 'Previous', 'eatforeign' ),
+				'next_text' => __( 'Next', 'eatforeign' ),
+				'type'      => 'list',
+				'add_args'  => $add_args,
+			]
+		);
+
+		if (! is_string( $links ) || $links === '' ) {
+			return;
+		}
+
+		echo '<nav class="ef-pagination" aria-label="' . esc_attr__( 'Directory pages', 'eatforeign' ) . '">';
+		echo $links; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Escaped by paginate_links().
+		echo '</nav>';
 	}
 
 	public static function panel( string $title, string $content ): void {

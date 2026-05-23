@@ -29,8 +29,8 @@ final class Cron {
 			return;
 		}
 
-		// Process up to 5 pending holidays from the queue
-		for ( $i = 0; $i < 5; $i++ ) {
+		// Process pending queue items (continues after duplicate-dish links).
+		for ( $i = 0; $i < 300; $i++ ) {
 			$processed = ContentGenerator::process_pending_holiday();
 			if ( ! $processed ) {
 				break; // Queue is empty or failed
