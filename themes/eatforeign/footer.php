@@ -7,6 +7,8 @@
 
 declare(strict_types=1);
 
+use EatForeignTheme\Nav;
+
 ?>
 </main>
 <footer class="ef-site-footer">
@@ -17,31 +19,11 @@ declare(strict_types=1);
 				<?php esc_html_e( 'The world\'s food celebration calendar for discovering cultures, dishes, and places to eat together.', 'eatforeign' ); ?>
 			</p>
 		</div>
-		<div class="ef-site-footer__col">
-			<p class="ef-site-footer__heading"><?php esc_html_e( 'Explore', 'eatforeign' ); ?></p>
-			<ul class="ef-site-footer__links">
-				<li><a href="<?php echo esc_url( home_url( '/' ) ); ?>"><?php esc_html_e( 'Today', 'eatforeign' ); ?></a></li>
-				<li><a href="<?php echo esc_url( home_url( '/calendar' ) ); ?>"><?php esc_html_e( 'Calendar', 'eatforeign' ); ?></a></li>
-				<li><a href="<?php echo esc_url( home_url( '/directory' ) ); ?>"><?php esc_html_e( 'Food directory', 'eatforeign' ); ?></a></li>
-				<li><a href="<?php echo esc_url( home_url( '/passport' ) ); ?>"><?php esc_html_e( 'Food passport', 'eatforeign' ); ?></a></li>
-				<li><a href="<?php echo esc_url( home_url( '/' ) ); ?>"><?php esc_html_e( 'Home', 'eatforeign' ); ?></a></li>
-				<li><a href="<?php echo esc_url( home_url( '/#explore-by-country' ) ); ?>"><?php esc_html_e( 'Explore by country', 'eatforeign' ); ?></a></li>
-			</ul>
-		</div>
-		<div class="ef-site-footer__col">
-			<p class="ef-site-footer__heading"><?php esc_html_e( 'Account', 'eatforeign' ); ?></p>
-			<ul class="ef-site-footer__links">
-				<li><a href="<?php echo esc_url( home_url( '/login' ) ); ?>"><?php esc_html_e( 'Sign in', 'eatforeign' ); ?></a></li>
-				<li><a href="<?php echo esc_url( home_url( '/register' ) ); ?>"><?php esc_html_e( 'Create account', 'eatforeign' ); ?></a></li>
-			</ul>
-		</div>
-		<div class="ef-site-footer__col">
-			<p class="ef-site-footer__heading"><?php esc_html_e( 'Legal', 'eatforeign' ); ?></p>
-			<ul class="ef-site-footer__links">
-				<li><a href="<?php echo esc_url( home_url( '/#terms' ) ); ?>"><?php esc_html_e( 'Terms of Service', 'eatforeign' ); ?></a></li>
-				<li><a href="<?php echo esc_url( home_url( '/#privacy' ) ); ?>"><?php esc_html_e( 'Privacy Policy', 'eatforeign' ); ?></a></li>
-			</ul>
-		</div>
+		<?php
+		Nav::render_footer_column( 'footer-1', __( 'Explore', 'eatforeign' ), [ Nav::class, 'render_footer_1_fallback' ] );
+		Nav::render_footer_column( 'footer-2', __( 'Account', 'eatforeign' ), [ Nav::class, 'render_footer_2_fallback' ] );
+		Nav::render_footer_column( 'footer-3', __( 'Legal', 'eatforeign' ), [ Nav::class, 'render_footer_3_fallback' ] );
+		?>
 	</div>
 	<div class="ef-shell ef-site-footer__bottom">
 		<p class="ef-site-footer__copy">

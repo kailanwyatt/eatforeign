@@ -17,7 +17,8 @@ if (! $post instanceof WP_Post ) {
 	return;
 }
 
-$image       = Data::post_image( $post );
+$image          = Data::post_display_image( $post );
+$is_placeholder = Data::post_uses_placeholder_image( $post );
 $event_date  = (string) get_post_meta( $post->ID, 'ef_event_date', true );
 $description = (string) get_post_meta( $post->ID, 'ef_short_description', true );
 
@@ -36,12 +37,15 @@ $date_short = $event_date !== '' ? wp_date( 'M j', strtotime( $event_date ) ) : 
 
 ?>
 <article class="ef-card ef-card--celebration">
-	<a class="ef-card__link" href="<?php echo esc_url( get_permalink( $post ) ); ?>">
-		<?php if ( $image !== '' ) : ?>
-			<div class="ef-card__media">
-				<img class="ef-card__image" src="<?php echo esc_url( $image ); ?>" alt="<?php echo esc_attr( get_the_title( $post ) ); ?>" loading="lazy" />
-			</div>
-		<?php endif; ?>
+	<a class="ef-card__link" href="<?php echo esc_url( Data::catalog_permalink( $post ) ); ?>">
+		<div class="ef-card__media">
+			<img
+				class="ef-card__image<?php echo $is_placeholder ? ' ef-card__image--placeholder' : ''; ?>"
+				src="<?php echo esc_url( $image ); ?>"
+				alt="<?php echo esc_attr( get_the_title( $post ) ); ?>"
+				loading="lazy"
+			/>
+		</div>
 		<div class="ef-card__body">
 			<div class="ef-card__badges">
 				<span class="ef-pill ef-pill--accent"><?php echo esc_html( $type_label ); ?></span>

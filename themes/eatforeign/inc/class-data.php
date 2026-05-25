@@ -243,6 +243,51 @@ final class Data {
 	/**
 	 * @return list<WP_Post>
 	 */
+	public static function related_celebrations( int $celebration_id, int $limit = 6 ): array {
+		return self::plugin_ready() ? CatalogRepository::get_related_celebrations( $celebration_id, $limit ) : [];
+	}
+
+	/**
+	 * @return list<WP_Post>
+	 */
+	public static function related_dishes_for_celebration( int $celebration_id, int $limit = 4 ): array {
+		return self::plugin_ready() ? CatalogRepository::get_related_dishes_for_celebration( $celebration_id, $limit ) : [];
+	}
+
+	/**
+	 * @return array{url: string, name: string, flag: string}|null
+	 */
+	public static function celebration_country_link( int $celebration_id ): ?array {
+		$terms = wp_get_post_terms( $celebration_id, 'ef_country', [ 'number' => 1 ] );
+		if ( is_wp_error( $terms ) || $terms === [] ) {
+			return null;
+		}
+
+		$term = $terms[0];
+		$name = (string) $term->name;
+		$flag = get_term_meta( $term->term_id, 'ef_flag_emoji', true );
+		$flag = is_string( $flag ) ? trim( $flag ) : '';
+
+		$country_post = get_page_by_path( $term->slug, OBJECT, PostType::COUNTRY );
+		if ( ! $country_post instanceof WP_Post || $country_post->post_status !== 'publish' ) {
+			$country_post = get_page_by_title( $name, OBJECT, PostType::COUNTRY );
+		}
+
+		$url = '';
+		if ( $country_post instanceof WP_Post && $country_post->post_status === 'publish' ) {
+			$url = (string) get_permalink( $country_post );
+		}
+
+		return [
+			'url'  => $url,
+			'name' => $name,
+			'flag' => $flag,
+		];
+	}
+
+	/**
+	 * @return list<WP_Post>
+	 */
 	public static function featured_posts( int $limit = 6 ): array {
 		if (! self::plugin_ready() || ! class_exists( CommunityRepository::class ) ) {
 			return [];
@@ -300,6 +345,47 @@ final class Data {
 		$image_url = get_post_meta( $post->ID, 'ef_image_url', true );
 
 		return is_string( $image_url ) ? $image_url : '';
+	}
+
+	public static function placeholder_image_url(): string {
+		return get_template_directory_uri() . '/assets/placeholder-card.svg';
+	}
+
+	public static function post_display_image( WP_Post $post ): string {
+		$image = self::post_image( $post );
+
+		return $image !== '' ? $image : self::placeholder_image_url();
+	}
+
+	public static function post_uses_placeholder_image( WP_Post $post ): bool {
+		return self::post_image( $post ) === '';
+	}
+
+	public static function catalog_permalink( WP_Post $post ): string {
+		$slug_map = [
+			'ef_dish'         => 'dishes',
+			'ef_celebration'  => 'celebrations',
+			'ef_country'      => 'countries',
+			'ef_restaurant'   => 'restaurants',
+		];
+
+		$base = $slug_map[ $post->post_type ] ?? '';
+
+		if ( $base === '' || $post->post_name === '' ) {
+			return home_url( '/' );
+		}
+
+		$permalink = get_permalink( $post );
+
+		if (
+			is_string( $permalink )
+			&& $permalink !== ''
+			&& str_contains( $permalink, '/' . $base . '/' )
+		) {
+			return $permalink;
+		}
+
+		return home_url( '/' . $base . '/' . $post->post_name . '/' );
 	}
 
 	/**
@@ -400,13 +486,11 @@ final class Data {
 	public static function celebration_completed( int $celebration_id ): bool {
 		$user_id = get_current_user_id();
 
-		if ( $user_id <= 0 ) {
+		if ( $user_id <= 0 || ! class_exists( CommunityRepository::class ) ) {
 			return false;
 		}
 
-		$completed = get_user_meta( $user_id, 'ef_completed_celebration_ids', true );
-
-		return is_array( $completed ) && in_array( $celebration_id, array_map( 'absint', $completed ), true );
+		return CommunityRepository::user_completed_celebration( $user_id, $celebration_id );
 	}
 
 	/**

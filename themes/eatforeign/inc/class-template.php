@@ -70,12 +70,14 @@ final class Template {
 	/**
 	 * @param list<WP_Post> $posts
 	 */
-	public static function card_grid( array $posts, string $card ): void {
+	public static function card_grid( array $posts, string $card, string $grid_class = '' ): void {
 		if ( $posts === [] ) {
 			return;
 		}
 
-		echo '<div class="ef-grid">';
+		$classes = trim( 'ef-grid ' . $grid_class );
+
+		echo '<div class="' . esc_attr( $classes ) . '">';
 
 		foreach ( $posts as $post ) {
 			get_template_part( 'template-parts/card', $card, [ 'post' => $post ] );
@@ -139,6 +141,53 @@ final class Template {
 			[
 				'title'   => $title,
 				'content' => $content,
+			]
+		);
+	}
+
+	/**
+	 * Section with optional empty-state message when there are no posts.
+	 *
+	 * @param list<WP_Post> $posts
+	 */
+	public static function section_with_empty(
+		string $title,
+		array $posts,
+		string $card,
+		?string $description = null,
+		?string $empty_html = null,
+		?string $anchor_id = null,
+		?string $cta_url = null,
+		?string $cta_label = null
+	): void {
+		if ( $posts === [] && ( $empty_html === null || ! Data::has_text( wp_strip_all_tags( $empty_html ) ) ) ) {
+			return;
+		}
+
+		ob_start();
+
+		if ( $posts === [] && $empty_html !== null ) {
+			echo '<div class="ef-empty-state">' . $empty_html . '</div>'; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Built with escaped fragments at call site.
+		} else {
+			self::card_grid( $posts, $card, $card === 'community-post' ? 'ef-grid--community' : '' );
+		}
+
+		$content = ob_get_clean();
+
+		if (! is_string( $content ) || $content === '' ) {
+			return;
+		}
+
+		get_template_part(
+			'template-parts/section',
+			null,
+			[
+				'title'       => $title,
+				'description' => $description,
+				'content'     => $content,
+				'anchor_id'   => $anchor_id,
+				'cta_url'     => $cta_url,
+				'cta_label'   => $cta_label,
 			]
 		);
 	}

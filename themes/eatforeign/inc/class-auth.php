@@ -41,12 +41,17 @@ final class Auth {
 		$user     = wp_authenticate( $email, $password );
 
 		if ( $user instanceof WP_Error ) {
-			self::redirect_with_error( home_url( '/login' ), $user->get_error_message() );
+			$login_url = home_url( '/login' );
+			$redirect  = isset( $_POST['redirect_to'] ) ? esc_url_raw( wp_unslash( (string) $_POST['redirect_to'] ) ) : '';
+			if ( $redirect !== '' && wp_validate_redirect( $redirect, '' ) !== '' ) {
+				$login_url = add_query_arg( 'redirect_to', rawurlencode( $redirect ), $login_url );
+			}
+			self::redirect_with_error( $login_url, $user->get_error_message() );
 		}
 
 		wp_set_current_user( $user->ID );
 		wp_set_auth_cookie( $user->ID );
-		wp_safe_redirect( home_url( '/account/profile' ) );
+		wp_safe_redirect( self::redirect_after_auth( home_url( '/account/profile' ) ) );
 		exit;
 	}
 
@@ -88,7 +93,7 @@ final class Auth {
 
 		wp_set_current_user( $user_id );
 		wp_set_auth_cookie( $user_id );
-		wp_safe_redirect( home_url( '/account/profile' ) );
+		wp_safe_redirect( self::redirect_after_auth( home_url( '/account/profile' ) ) );
 		exit;
 	}
 
@@ -367,15 +372,27 @@ final class Auth {
 		self::verify_nonce( 'ef_create_celebration_post' );
 		self::require_user();
 
+		$caption = sanitize_textarea_field( (string) ( $_POST['caption'] ?? '' ) );
+		if ( $caption === '' ) {
+			$redirect = wp_get_referer() ?: home_url( '/' );
+			self::redirect_with_error( $redirect, __( 'Please write a short story for your post.', 'eatforeign' ) );
+		}
+
+		$image_url = self::celebration_image_url_from_request();
+		if ( $image_url === '' ) {
+			$image_url = esc_url_raw( (string) ( $_POST['image_url'] ?? '' ) );
+		}
+
 		$post_id = CommunityRepository::create_celebration_post(
 			get_current_user_id(),
 			[
-				'celebrationId'  => absint( $_POST['celebration_id'] ?? 0 ),
-				'dishId'         => absint( $_POST['dish_id'] ?? 0 ),
-				'caption'        => sanitize_textarea_field( (string) ( $_POST['caption'] ?? '' ) ),
-				'rating'         => (float) ( $_POST['rating'] ?? 0 ),
-				'imageUrl'       => esc_url_raw( (string) ( $_POST['image_url'] ?? '' ) ),
-				'restaurantName' => sanitize_text_field( (string) ( $_POST['restaurant_name'] ?? '' ) ),
+				'celebrationId'     => absint( $_POST['celebration_id'] ?? 0 ),
+				'dishId'            => absint( $_POST['dish_id'] ?? 0 ),
+				'caption'           => $caption,
+				'rating'            => (float) ( $_POST['rating'] ?? 0 ),
+				'imageUrl'          => $image_url,
+				'restaurantName'    => sanitize_text_field( (string) ( $_POST['restaurant_name'] ?? '' ) ),
+				'firstTimeTrying'   => isset( $_POST['first_time_trying'] ),
 			]
 		);
 
@@ -397,9 +414,52 @@ final class Auth {
 
 	private static function require_user(): void {
 		if ( get_current_user_id() <= 0 ) {
-			wp_safe_redirect( home_url( '/login' ) );
+			$redirect = isset( $_SERVER['REQUEST_URI'] )
+				? home_url( wp_unslash( (string) $_SERVER['REQUEST_URI'] ) )
+				: home_url( '/' );
+			wp_safe_redirect(
+				add_query_arg( 'redirect_to', rawurlencode( $redirect ), home_url( '/login' ) )
+			);
 			exit;
 		}
+	}
+
+	private static function celebration_image_url_from_request(): string {
+		if ( ! isset( $_FILES['celebration_image'] ) || ! is_array( $_FILES['celebration_image'] ) ) {
+			return '';
+		}
+
+		$file = $_FILES['celebration_image'];
+
+		if ( (int) ( $file['error'] ?? UPLOAD_ERR_NO_FILE ) !== UPLOAD_ERR_OK ) {
+			return '';
+		}
+
+		require_once ABSPATH . 'wp-admin/includes/file.php';
+		require_once ABSPATH . 'wp-admin/includes/image.php';
+		require_once ABSPATH . 'wp-admin/includes/media.php';
+
+		$attachment_id = media_handle_upload( 'celebration_image', 0 );
+
+		if ( is_wp_error( $attachment_id ) ) {
+			return '';
+		}
+
+		return (string) wp_get_attachment_url( (int) $attachment_id );
+	}
+
+	private static function redirect_after_auth( string $fallback ): string {
+		$target = isset( $_POST['redirect_to'] )
+			? esc_url_raw( wp_unslash( (string) $_POST['redirect_to'] ) )
+			: '';
+
+		if ( $target === '' && isset( $_GET['redirect_to'] ) ) {
+			$target = esc_url_raw( wp_unslash( (string) $_GET['redirect_to'] ) );
+		}
+
+		$validated = wp_validate_redirect( $target, '' );
+
+		return $validated !== '' ? $validated : $fallback;
 	}
 
 	private static function redirect_with_error( string $url, string $message ): void {

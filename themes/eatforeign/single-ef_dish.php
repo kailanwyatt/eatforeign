@@ -19,7 +19,8 @@ while ( have_posts() ) :
 	$cultural_meaning = (string) get_post_meta( $dish_id, 'ef_cultural_meaning', true );
 	$ingredients      = array_values( array_filter( (array) get_post_meta( $dish_id, 'ef_ingredients', true ) ) );
 	$linked           = Data::posts_by_ids( (array) get_post_meta( $dish_id, 'ef_celebration_ids', true ) );
-	$hero_image       = Data::post_image( get_post() );
+	$hero_image       = Data::post_display_image( get_post() );
+	$hero_placeholder = Data::post_uses_placeholder_image( get_post() );
 	$image_caption    = Data::dish_image_caption( $dish_id );
 	$image_is_ai      = Data::dish_image_is_ai_generated( $dish_id );
 	$origin           = (string) get_post_meta( $dish_id, 'ef_origin_country', true );
@@ -35,16 +36,18 @@ while ( have_posts() ) :
 	?>
 	<div class="ef-shell ef-dish-page">
 		<article <?php post_class( 'ef-dish-hero' ); ?>>
-			<?php if ( $hero_image !== '' ) : ?>
-				<figure class="ef-dish-hero__media">
-					<img class="ef-dish-hero__image" src="<?php echo esc_url( $hero_image ); ?>" alt="<?php the_title_attribute(); ?>" />
-					<?php if ( $image_caption !== '' ) : ?>
-						<figcaption class="ef-dish-hero__caption<?php echo $image_is_ai ? ' ef-dish-hero__caption--ai' : ''; ?>">
-							<?php echo esc_html( $image_caption ); ?>
-						</figcaption>
-					<?php endif; ?>
-				</figure>
-			<?php endif; ?>
+			<figure class="ef-dish-hero__media">
+				<img
+					class="ef-dish-hero__image<?php echo $hero_placeholder ? ' ef-dish-hero__image--placeholder' : ''; ?>"
+					src="<?php echo esc_url( $hero_image ); ?>"
+					alt="<?php the_title_attribute(); ?>"
+				/>
+				<?php if ( ! $hero_placeholder && $image_caption !== '' ) : ?>
+					<figcaption class="ef-dish-hero__caption<?php echo $image_is_ai ? ' ef-dish-hero__caption--ai' : ''; ?>">
+						<?php echo esc_html( $image_caption ); ?>
+					</figcaption>
+				<?php endif; ?>
+			</figure>
 			<div class="ef-dish-hero__body">
 				<?php if ( $countries['all'] !== [] ) : ?>
 					<div class="ef-dish-hero__countries" aria-label="<?php esc_attr_e( 'Countries and regions', 'eatforeign' ); ?>">

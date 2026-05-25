@@ -95,6 +95,87 @@ final class Nav {
 		return false;
 	}
 
+	public static function render_footer_column( string $location, string $default_heading, callable $fallback ): void {
+		$heading = self::footer_menu_heading( $location, $default_heading );
+		?>
+		<div class="ef-site-footer__col">
+			<p class="ef-site-footer__heading"><?php echo esc_html( $heading ); ?></p>
+			<?php
+			wp_nav_menu(
+				[
+					'theme_location' => $location,
+					'container'      => false,
+					'menu_class'     => 'ef-site-footer__links',
+					'fallback_cb'    => $fallback,
+					'depth'          => 1,
+				]
+			);
+			?>
+		</div>
+		<?php
+	}
+
+	private static function footer_menu_heading( string $location, string $default_heading ): string {
+		$locations = get_nav_menu_locations();
+		$menu_id   = isset( $locations[ $location ] ) ? (int) $locations[ $location ] : 0;
+
+		if ( $menu_id <= 0 ) {
+			return $default_heading;
+		}
+
+		$menu = wp_get_nav_menu_object( $menu_id );
+
+		if ( $menu instanceof \WP_Term && $menu->name !== '' ) {
+			return $menu->name;
+		}
+
+		return $default_heading;
+	}
+
+	public static function render_footer_1_fallback(): void {
+		self::render_footer_links_fallback(
+			[
+				[ home_url( '/' ), __( 'Today', 'eatforeign' ) ],
+				[ home_url( '/calendar' ), __( 'Calendar', 'eatforeign' ) ],
+				[ home_url( '/directory' ), __( 'Food directory', 'eatforeign' ) ],
+				[ home_url( '/passport' ), __( 'Food passport', 'eatforeign' ) ],
+				[ home_url( '/' ), __( 'Home', 'eatforeign' ) ],
+				[ home_url( '/#explore-by-country' ), __( 'Explore by country', 'eatforeign' ) ],
+			]
+		);
+	}
+
+	public static function render_footer_2_fallback(): void {
+		self::render_footer_links_fallback(
+			[
+				[ home_url( '/login' ), __( 'Sign in', 'eatforeign' ) ],
+				[ home_url( '/register' ), __( 'Create account', 'eatforeign' ) ],
+			]
+		);
+	}
+
+	public static function render_footer_3_fallback(): void {
+		self::render_footer_links_fallback(
+			[
+				[ home_url( '/#terms' ), __( 'Terms of Service', 'eatforeign' ) ],
+				[ home_url( '/#privacy' ), __( 'Privacy Policy', 'eatforeign' ) ],
+			]
+		);
+	}
+
+	/**
+	 * @param list<array{0: string, 1: string}> $links
+	 */
+	private static function render_footer_links_fallback( array $links ): void {
+		echo '<ul class="ef-site-footer__links">';
+
+		foreach ( $links as $link ) {
+			echo '<li><a href="' . esc_url( $link[0] ) . '">' . esc_html( $link[1] ) . '</a></li>';
+		}
+
+		echo '</ul>';
+	}
+
 	private static function menu_item_path( \WP_Post $item ): string {
 		$url = '';
 

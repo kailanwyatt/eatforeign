@@ -9,7 +9,9 @@ declare(strict_types=1);
 
 get_header();
 
-$error = isset( $_GET['error'] ) ? sanitize_text_field( wp_unslash( (string) $_GET['error'] ) ) : '';
+$error       = isset( $_GET['error'] ) ? sanitize_text_field( wp_unslash( (string) $_GET['error'] ) ) : '';
+$redirect_to = isset( $_GET['redirect_to'] ) ? esc_url_raw( wp_unslash( (string) $_GET['redirect_to'] ) ) : '';
+$redirect_to = wp_validate_redirect( $redirect_to, '' );
 ?>
 <div class="ef-auth">
 	<div class="ef-auth__promo">
@@ -31,6 +33,9 @@ $error = isset( $_GET['error'] ) ? sanitize_text_field( wp_unslash( (string) $_G
 			<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" class="ef-form">
 				<?php wp_nonce_field( 'ef_register' ); ?>
 				<input type="hidden" name="action" value="ef_register" />
+				<?php if ( $redirect_to !== '' ) : ?>
+					<input type="hidden" name="redirect_to" value="<?php echo esc_attr( $redirect_to ); ?>" />
+				<?php endif; ?>
 				<label class="ef-field">
 					<span><?php esc_html_e( 'Display name', 'eatforeign' ); ?></span>
 					<input type="text" name="display_name" autocomplete="name" />
@@ -46,7 +51,7 @@ $error = isset( $_GET['error'] ) ? sanitize_text_field( wp_unslash( (string) $_G
 				<button type="submit" class="ef-button ef-button--primary ef-button--block"><?php esc_html_e( 'Create account', 'eatforeign' ); ?></button>
 			</form>
 			<p class="ef-auth__switch">
-				<a href="<?php echo esc_url( home_url( '/login' ) ); ?>"><?php esc_html_e( 'Already have an account?', 'eatforeign' ); ?></a>
+				<a href="<?php echo esc_url( $redirect_to !== '' ? add_query_arg( 'redirect_to', rawurlencode( $redirect_to ), home_url( '/login' ) ) : home_url( '/login' ) ); ?>"><?php esc_html_e( 'Already have an account?', 'eatforeign' ); ?></a>
 			</p>
 			<p class="ef-auth__legal">
 				<?php esc_html_e( 'By continuing, you agree to our', 'eatforeign' ); ?>

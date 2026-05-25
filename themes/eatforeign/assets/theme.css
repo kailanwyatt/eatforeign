@@ -378,7 +378,22 @@ img {
   object-fit: cover;
 }
 
+.ef-card__image--placeholder,
+.ef-dish-hero__image--placeholder,
+.ef-calendar-preview__image--placeholder {
+  object-fit: contain;
+  padding: 1.25rem;
+  background: #f3efe8;
+}
+
+/* Inline flag (e.g. celebration title); overlay styles only on dish media badge below. */
 .ef-card__flag {
+  flex-shrink: 0;
+  line-height: 1;
+  font-size: 1.15rem;
+}
+
+.ef-card__media > .ef-card__flag {
   position: absolute;
   left: 0.65rem;
   bottom: 0.65rem;
@@ -391,6 +406,22 @@ img {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.ef-card__flag img.emoji,
+.ef-card__country-flag img.emoji {
+  width: 1.1em !important;
+  height: 1.1em !important;
+  margin: 0 !important;
+  vertical-align: -0.1em !important;
+  box-shadow: none !important;
+  border: none !important;
+  background: none !important;
+}
+
+.ef-card__media > .ef-card__flag img.emoji {
+  width: 1em !important;
+  height: 1em !important;
 }
 
 .ef-card__badges {
@@ -449,9 +480,8 @@ img {
   gap: 0.35rem;
 }
 
-.ef-card__flag {
-  flex-shrink: 0;
-  line-height: 1;
+.ef-card--celebration .ef-card__flag {
+  font-size: 1.25rem;
 }
 
 .ef-card__stars {
@@ -781,7 +811,6 @@ img {
   padding: 0.45rem;
   background: var(--ef-surface);
   color: inherit;
-  text-decoration: none;
   display: flex;
   flex-direction: column;
   align-items: stretch;
@@ -790,6 +819,16 @@ img {
 
 .ef-calendar-cell:hover {
   background: #fffaf5;
+}
+
+.ef-calendar-cell__day {
+  color: inherit;
+  text-decoration: none;
+  align-self: flex-start;
+}
+
+.ef-calendar-cell__day:hover .ef-calendar-cell__num {
+  color: var(--ef-accent);
 }
 
 .ef-calendar-cell--muted {
@@ -841,6 +880,20 @@ img {
   font-weight: 700;
   overflow: hidden;
   max-width: 100%;
+  text-decoration: none;
+  border: 1px solid transparent;
+  cursor: pointer;
+}
+
+.ef-calendar-chip:hover {
+  background: rgba(52, 120, 246, 0.2);
+  border-color: rgba(52, 120, 246, 0.35);
+}
+
+.ef-calendar-chip.is-selected {
+  background: rgba(211, 84, 0, 0.14);
+  border-color: rgba(211, 84, 0, 0.45);
+  color: var(--ef-accent);
 }
 
 .ef-calendar-chip__flag {
@@ -874,6 +927,104 @@ img {
 .ef-calendar-detail__meta {
   margin: 0.35rem 0 0;
   color: var(--ef-muted);
+}
+
+.ef-calendar-detail__hint {
+  margin: 0 0 1.25rem;
+  font-size: 0.95rem;
+}
+
+.ef-calendar-preview {
+  display: grid;
+  gap: 1.25rem;
+  margin-bottom: 1.5rem;
+  padding: 1.25rem;
+  border: 1px solid var(--ef-line);
+  border-radius: var(--ef-radius);
+  background: var(--ef-surface);
+  box-shadow: 0 12px 32px rgba(26, 26, 26, 0.06);
+}
+
+@media (min-width: 720px) {
+  .ef-calendar-preview {
+    grid-template-columns: minmax(0, 14rem) 1fr;
+    align-items: start;
+  }
+}
+
+.ef-calendar-preview__media {
+  border-radius: var(--ef-radius-sm);
+  overflow: hidden;
+  aspect-ratio: 4 / 3;
+  background: var(--ef-canvas);
+}
+
+.ef-calendar-preview__image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.ef-calendar-preview__badges {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.ef-calendar-preview__date {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--ef-muted);
+}
+
+.ef-calendar-preview__title {
+  margin: 0.65rem 0 0;
+  font-family: var(--ef-font-display);
+  font-size: 1.5rem;
+  line-height: 1.2;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.ef-calendar-preview__flag {
+  font-size: 1.35rem;
+  line-height: 1;
+}
+
+.ef-calendar-preview__copy {
+  margin: 0.65rem 0 0;
+  color: var(--ef-muted);
+  line-height: 1.5;
+  font-size: 0.95rem;
+}
+
+.ef-calendar-preview__country {
+  margin: 0.5rem 0 0;
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.ef-calendar-preview__country a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.ef-calendar-preview__country a:hover {
+  color: var(--ef-accent);
+}
+
+.ef-calendar-preview__actions {
+  margin-top: 1.15rem;
+}
+
+.ef-calendar-detail__card.is-highlighted .ef-card {
+  outline: 2px solid rgba(211, 84, 0, 0.45);
+  outline-offset: 2px;
 }
 
 /* ——— Directory filters ——— */
@@ -1172,6 +1323,10 @@ img {
   background: var(--ef-accent-hover);
   border-color: var(--ef-accent-hover);
   color: #fff;
+}
+
+.ef-button--secondary {
+  background: var(--ef-canvas);
 }
 
 .ef-button--join {
@@ -2178,6 +2333,409 @@ img {
   font-size: 0.65rem;
   font-weight: 800;
   color: var(--ef-muted);
+}
+
+/* ——— Celebration participate ——— */
+.ef-participate {
+  display: grid;
+  gap: 1.25rem;
+}
+
+.ef-participate__lead {
+  margin: 0;
+  color: var(--ef-ink);
+  line-height: 1.55;
+}
+
+.ef-participate__benefits {
+  margin: 0;
+  padding-left: 1.15rem;
+  color: var(--ef-muted);
+  display: grid;
+  gap: 0.35rem;
+}
+
+.ef-participate__cta {
+  display: grid;
+  gap: 0.65rem;
+}
+
+.ef-participate__fineprint {
+  margin: 0;
+  font-size: 0.82rem;
+  color: var(--ef-muted);
+  line-height: 1.45;
+}
+
+.ef-participate__identity {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.ef-participate__avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 50%;
+  background: #ffe8d6;
+  color: var(--ef-accent);
+  font-weight: 800;
+  font-size: 0.85rem;
+  flex-shrink: 0;
+}
+
+.ef-participate__identity-label {
+  margin: 0;
+  font-size: 0.75rem;
+  color: var(--ef-muted);
+  font-weight: 600;
+}
+
+.ef-participate__identity-name {
+  margin: 0;
+  font-weight: 700;
+}
+
+.ef-participate__completion {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.85rem;
+  padding: 0.85rem 1rem;
+  border: 1px solid var(--ef-line);
+  border-radius: var(--ef-radius-sm);
+  background: #fffaf5;
+}
+
+.ef-participate__completion-copy {
+  flex: 1 1 12rem;
+}
+
+.ef-participate__completion-copy strong {
+  display: block;
+  margin-bottom: 0.2rem;
+}
+
+.ef-participate__completion-copy p {
+  margin: 0;
+  font-size: 0.88rem;
+  color: var(--ef-muted);
+}
+
+.ef-participate__fieldset {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  display: grid;
+  gap: 1rem;
+}
+
+.ef-participate__legend {
+  font-size: 1.05rem;
+  font-weight: 700;
+  padding: 0;
+  margin-bottom: 0.15rem;
+}
+
+.ef-participate__hint {
+  margin: 0 0 0.25rem;
+  font-size: 0.88rem;
+  color: var(--ef-muted);
+}
+
+.ef-form--participate {
+  margin-top: 0;
+}
+
+.ef-participate-photo__preview {
+  display: block;
+  width: 100%;
+  max-height: 10rem;
+  object-fit: cover;
+}
+
+.ef-participate [data-photo-field] .ef-passport-photo-drop:has(.ef-participate-photo__preview:not([hidden])) .ef-passport-photo-drop__label {
+  position: absolute;
+  inset: auto 0.5rem 0.5rem auto;
+  width: auto;
+  min-height: 0;
+  padding: 0.35rem 0.65rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.92);
+  font-size: 0.78rem;
+}
+
+.ef-button--ghost {
+  background: transparent;
+}
+
+.ef-button--ghost:hover {
+  background: var(--ef-surface);
+}
+
+/* ——— Celebration single page ——— */
+.ef-celebration-page {
+  display: grid;
+  gap: 2rem;
+}
+
+.ef-celebration-hero {
+  overflow: hidden;
+  border-radius: var(--ef-radius);
+  background: var(--ef-surface);
+  box-shadow: var(--ef-shadow);
+}
+
+.ef-celebration-hero__media {
+  position: relative;
+  max-height: 22rem;
+  overflow: hidden;
+}
+
+.ef-celebration-hero__image {
+  width: 100%;
+  height: 100%;
+  max-height: 22rem;
+  object-fit: cover;
+  display: block;
+}
+
+.ef-celebration-hero__body {
+  padding: 1.5rem 1.75rem 1.75rem;
+}
+
+.ef-celebration-hero__chips {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 0.65rem;
+  margin-bottom: 0.75rem;
+}
+
+.ef-celebration-hero__date {
+  display: inline-flex;
+  padding: 0.3rem 0.65rem;
+  border-radius: 999px;
+  border: 1px solid var(--ef-line);
+  background: var(--ef-canvas);
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.ef-celebration-hero__country {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.3rem 0.65rem;
+  border-radius: 999px;
+  border: 1px solid var(--ef-line);
+  background: var(--ef-canvas);
+  font-size: 0.82rem;
+  font-weight: 700;
+  text-decoration: none;
+  color: inherit;
+}
+
+.ef-celebration-hero__country:hover {
+  border-color: #e8c4a8;
+  color: var(--ef-accent);
+}
+
+.ef-celebration-hero__title {
+  margin: 0;
+  font-size: clamp(2rem, 4vw, 2.75rem);
+  line-height: 1.08;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.ef-celebration-hero__flag {
+  font-size: 1.35em;
+  line-height: 1;
+}
+
+.ef-celebration-hero__copy {
+  margin: 0.85rem 0 0;
+  max-width: 42rem;
+  color: var(--ef-muted);
+  font-size: 1.05rem;
+  line-height: 1.55;
+}
+
+.ef-celebration-hero__when {
+  margin: 0.65rem 0 0;
+  font-size: 0.9rem;
+  color: var(--ef-muted);
+  font-weight: 600;
+}
+
+.ef-celebration-hero__actions {
+  margin-top: 1.25rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+}
+
+.ef-celebration-layout {
+  display: grid;
+  gap: 1.5rem;
+  align-items: start;
+}
+
+@media (min-width: 960px) {
+  .ef-celebration-layout {
+    grid-template-columns: minmax(0, 1fr) minmax(18rem, 22rem);
+    gap: 2rem;
+  }
+}
+
+.ef-celebration-main,
+.ef-celebration-aside {
+  display: grid;
+  gap: 1.5rem;
+}
+
+.ef-celebration-aside {
+  position: relative;
+}
+
+@media (min-width: 960px) {
+  #participate .ef-panel {
+    position: sticky;
+    top: 1.25rem;
+  }
+}
+
+.ef-celebration-related {
+  display: grid;
+  gap: 1.5rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid var(--ef-line);
+}
+
+.ef-celebration-explore {
+  padding: 1.15rem 1.25rem;
+  border: 1px solid var(--ef-line);
+  border-radius: var(--ef-radius-sm);
+  background: var(--ef-surface);
+}
+
+.ef-celebration-explore__title {
+  margin: 0 0 0.65rem;
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.ef-celebration-explore__list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 0.45rem;
+}
+
+.ef-celebration-explore__list a {
+  font-weight: 600;
+  color: var(--ef-accent);
+  text-decoration: none;
+}
+
+.ef-celebration-explore__list a:hover {
+  text-decoration: underline;
+}
+
+.ef-grid--community {
+  grid-template-columns: repeat(auto-fill, minmax(16.5rem, 1fr));
+}
+
+.ef-card--community .ef-card__body {
+  display: grid;
+  gap: 0.65rem;
+}
+
+.ef-card--community .ef-card__author {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+}
+
+.ef-card--community .ef-card__avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: 50%;
+  background: #ffe8d6;
+  color: var(--ef-accent);
+  font-weight: 800;
+  font-size: 0.78rem;
+  flex-shrink: 0;
+}
+
+.ef-card--community .ef-card__author-meta {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  gap: 0.1rem;
+}
+
+.ef-card--community .ef-card__author-name {
+  font-size: 0.92rem;
+}
+
+.ef-card--community .ef-card__rating-badge {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.1rem;
+  flex-shrink: 0;
+}
+
+.ef-card--community .ef-card__stars {
+  color: var(--ef-accent);
+  font-size: 0.75rem;
+  letter-spacing: 0.04em;
+}
+
+.ef-card--community .ef-card__rating-num {
+  font-size: 0.78rem;
+  font-weight: 800;
+  color: var(--ef-muted);
+}
+
+.ef-card--community .ef-card__venue {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--ef-muted);
+}
+
+.ef-card--community .ef-card__venue-label {
+  font-weight: 700;
+  margin-right: 0.25rem;
+}
+
+.ef-empty-state {
+  padding: 1.5rem;
+  border: 1px dashed var(--ef-line);
+  border-radius: var(--ef-radius-sm);
+  background: #fffaf5;
+  text-align: center;
+  color: var(--ef-muted);
+}
+
+.ef-empty-state p {
+  margin: 0 0 0.75rem;
+}
+
+.ef-empty-state p:last-child {
+  margin-bottom: 0;
 }
 
 .ef-passport-photo-drop {

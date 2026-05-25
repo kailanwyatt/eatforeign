@@ -26,7 +26,10 @@ final class Theme {
 
 		register_nav_menus(
 			[
-				'primary' => __( 'Primary Menu', 'eatforeign' ),
+				'primary'  => __( 'Primary Menu', 'eatforeign' ),
+				'footer-1' => __( 'Footer Menu 1', 'eatforeign' ),
+				'footer-2' => __( 'Footer Menu 2', 'eatforeign' ),
+				'footer-3' => __( 'Footer Menu 3', 'eatforeign' ),
 			]
 		);
 	}
@@ -57,6 +60,26 @@ final class Theme {
 				get_template_directory_uri() . '/assets/passport-wizard.js',
 				[],
 				self::asset_version( 'passport-wizard.js' ),
+				true
+			);
+		}
+
+		if ( is_singular( 'ef_celebration' ) ) {
+			wp_enqueue_script(
+				'eatforeign-celebration-participate',
+				get_template_directory_uri() . '/assets/celebration-participate.js',
+				[],
+				self::asset_version( 'celebration-participate.js' ),
+				true
+			);
+		}
+
+		if ( Helpers::current_ef_route() === 'calendar' ) {
+			wp_enqueue_script(
+				'eatforeign-calendar',
+				get_template_directory_uri() . '/assets/calendar.js',
+				[],
+				self::asset_version( 'calendar.js' ),
 				true
 			);
 		}

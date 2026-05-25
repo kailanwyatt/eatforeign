@@ -17,7 +17,8 @@ if (! $post instanceof WP_Post ) {
 	return;
 }
 
-$image     = Data::post_image( $post );
+$image          = Data::post_display_image( $post );
+$is_placeholder = Data::post_uses_placeholder_image( $post );
 $overview  = (string) get_post_meta( $post->ID, 'ef_overview', true );
 $excerpt   = get_the_excerpt( $post );
 $copy      = Data::has_text( $overview ) ? $overview : $excerpt;
@@ -26,10 +27,15 @@ $name      = Data::country_display_name( $post );
 
 ?>
 <article class="ef-card ef-card--country">
-	<a class="ef-card__link" href="<?php echo esc_url( get_permalink( $post ) ); ?>">
-		<?php if ( $image !== '' ) : ?>
-			<img class="ef-card__image" src="<?php echo esc_url( $image ); ?>" alt="<?php echo esc_attr( $name ); ?>" loading="lazy" />
-		<?php endif; ?>
+	<a class="ef-card__link" href="<?php echo esc_url( Data::catalog_permalink( $post ) ); ?>">
+		<div class="ef-card__media">
+			<img
+				class="ef-card__image<?php echo $is_placeholder ? ' ef-card__image--placeholder' : ''; ?>"
+				src="<?php echo esc_url( $image ); ?>"
+				alt="<?php echo esc_attr( $name ); ?>"
+				loading="lazy"
+			/>
+		</div>
 		<div class="ef-card__body">
 			<div class="ef-card__title-row ef-card__title-row--country">
 				<?php if ( $flag !== '' ) : ?>

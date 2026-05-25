@@ -44,6 +44,37 @@ if ( $sel === null ) {
 $selected_key    = sprintf( '%04d-%02d-%02d', $y, $m, $sel );
 $selected_events = $grouped[ $selected_key ] ?? [];
 
+$calendar_day_url = static function ( int $year, int $month, int $day ): string {
+	return add_query_arg(
+		[
+			'y' => $year,
+			'm' => $month,
+			'd' => $day,
+		],
+		home_url( '/calendar' )
+	);
+};
+
+$calendar_celebration_url = static function ( int $year, int $month, int $day, WP_Post $celebration ) use ( $calendar_day_url ): string {
+	return add_query_arg(
+		'c',
+		$celebration->post_name,
+		$calendar_day_url( $year, $month, $day )
+	) . '#calendar-celebration-preview';
+};
+
+$selected_slug = isset( $_GET['c'] ) ? sanitize_title( wp_unslash( (string) $_GET['c'] ) ) : '';
+$focused_event = null;
+
+if ( $selected_slug !== '' ) {
+	foreach ( $selected_events as $event_post ) {
+		if ( $event_post instanceof WP_Post && $event_post->post_name === $selected_slug ) {
+			$focused_event = $event_post;
+			break;
+		}
+	}
+}
+
 $prev_m = $m === 1 ? 12 : $m - 1;
 $prev_y = $m === 1 ? $y - 1 : $y;
 $next_m = $m === 12 ? 1 : $m + 1;
@@ -137,7 +168,7 @@ $weeks = array_chunk( $cells, 7 );
 							$d        = (int) $cell['day'];
 							$is_today = $y === $today_y && $m === $today_m && $d === $today_d;
 							$is_sel   = $d === $sel;
-							$href     = esc_url( add_query_arg( [ 'y' => $y, 'm' => $m, 'd' => $d ], home_url( '/calendar' ) ) );
+							$day_href = esc_url( $calendar_day_url( $y, $m, $d ) );
 							$classes  = [ 'ef-calendar-cell' ];
 
 							if ( $is_sel ) {
@@ -152,27 +183,42 @@ $weeks = array_chunk( $cells, 7 );
 								$classes[] = 'has-events';
 							}
 							?>
-							<a class="<?php echo esc_attr( implode( ' ', $classes ) ); ?>" role="gridcell" href="<?php echo $href; ?>">
-								<span class="ef-calendar-cell__num"><?php echo esc_html( (string) $d ); ?></span>
+							<div class="<?php echo esc_attr( implode( ' ', $classes ) ); ?>" role="gridcell">
+								<a class="ef-calendar-cell__day" href="<?php echo $day_href; ?>">
+									<span class="ef-calendar-cell__num"><?php echo esc_html( (string) $d ); ?></span>
+								</a>
 								<?php if ( $cell['events'] !== [] ) : ?>
 									<div class="ef-calendar-cell__chips">
 										<?php foreach ( array_slice( $cell['events'], 0, 2 ) as $ev ) : ?>
 											<?php
-											$chip_flag = Data::celebration_flag_emoji( $ev );
+											if ( ! $ev instanceof WP_Post ) {
+												continue;
+											}
+
+											$chip_flag     = Data::celebration_flag_emoji( $ev );
+											$chip_selected = $is_sel && $focused_event instanceof WP_Post && $focused_event->ID === $ev->ID;
+											$chip_href     = esc_url( $calendar_celebration_url( $y, $m, $d, $ev ) );
+											$chip_classes  = 'ef-calendar-chip';
+
+											if ( $chip_selected ) {
+												$chip_classes .= ' is-selected';
+											}
 											?>
-											<span class="ef-calendar-chip">
+											<a class="<?php echo esc_attr( $chip_classes ); ?>" href="<?php echo $chip_href; ?>">
 												<?php if ( $chip_flag !== '' ) : ?>
 													<span class="ef-calendar-chip__flag" aria-hidden="true"><?php echo esc_html( $chip_flag ); ?></span>
 												<?php endif; ?>
 												<span class="ef-calendar-chip__label"><?php echo esc_html( get_the_title( $ev ) ); ?></span>
-											</span>
+											</a>
 										<?php endforeach; ?>
 										<?php if ( count( $cell['events'] ) > 2 ) : ?>
-											<span class="ef-calendar-chip ef-calendar-chip--more">+<?php echo esc_html( (string) ( count( $cell['events'] ) - 2 ) ); ?></span>
+											<a class="ef-calendar-chip ef-calendar-chip--more" href="<?php echo $day_href; ?>">
+												+<?php echo esc_html( (string) ( count( $cell['events'] ) - 2 ) ); ?>
+											</a>
 										<?php endif; ?>
 									</div>
 								<?php endif; ?>
-							</a>
+							</div>
 						<?php endforeach; ?>
 					</div>
 				<?php endforeach; ?>
@@ -197,10 +243,35 @@ $weeks = array_chunk( $cells, 7 );
 			<?php if ( $selected_events === [] ) : ?>
 				<p class="ef-muted"><?php esc_html_e( 'No celebrations in the catalog for this date.', 'eatforeign' ); ?></p>
 			<?php else : ?>
+				<?php if ( $focused_event instanceof WP_Post ) : ?>
+					<?php
+					get_template_part(
+						'template-parts/calendar-celebration',
+						'preview',
+						[ 'post' => $focused_event ]
+					);
+					?>
+				<?php else : ?>
+					<p class="ef-calendar-detail__hint ef-muted">
+						<?php esc_html_e( 'Select a celebration in the calendar above to preview it here.', 'eatforeign' ); ?>
+					</p>
+				<?php endif; ?>
 				<div class="ef-grid ef-grid--calendar-detail">
 					<?php
 					foreach ( $selected_events as $post ) {
+						if ( ! $post instanceof WP_Post ) {
+							continue;
+						}
+
+						$wrap_class = 'ef-calendar-detail__card';
+
+						if ( $focused_event instanceof WP_Post && $focused_event->ID === $post->ID ) {
+							$wrap_class .= ' is-highlighted';
+						}
+
+						echo '<div class="' . esc_attr( $wrap_class ) . '">';
 						get_template_part( 'template-parts/card', 'celebration', [ 'post' => $post ] );
+						echo '</div>';
 					}
 					?>
 				</div>

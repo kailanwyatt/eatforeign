@@ -18,7 +18,8 @@ if (! $post instanceof WP_Post ) {
 }
 
 $layout        = isset( $args['layout'] ) ? (string) $args['layout'] : 'default';
-$image         = Data::post_image( $post );
+$image         = Data::post_display_image( $post );
+$is_placeholder = Data::post_uses_placeholder_image( $post );
 $origin        = (string) get_post_meta( $post->ID, 'ef_origin_country', true );
 $rating        = (float) get_post_meta( $post->ID, 'ef_average_rating', true );
 $description   = get_the_excerpt( $post );
@@ -38,15 +39,18 @@ $card_class   = $is_directory ? 'ef-card ef-card--dish ef-card--dish-directory' 
 
 ?>
 <article class="<?php echo esc_attr( $card_class ); ?>">
-	<a class="ef-card__link" href="<?php echo esc_url( get_permalink( $post ) ); ?>">
-		<?php if ( $image !== '' ) : ?>
-			<div class="ef-card__media">
-				<img class="ef-card__image" src="<?php echo esc_url( $image ); ?>" alt="<?php echo esc_attr( get_the_title( $post ) ); ?>" loading="lazy" />
-				<?php if ( $is_directory && $country !== '' ) : ?>
-					<span class="ef-card__flag"><?php echo esc_html( $country ); ?></span>
-				<?php endif; ?>
-			</div>
-		<?php endif; ?>
+	<a class="ef-card__link" href="<?php echo esc_url( Data::catalog_permalink( $post ) ); ?>">
+		<div class="ef-card__media">
+			<img
+				class="ef-card__image<?php echo $is_placeholder ? ' ef-card__image--placeholder' : ''; ?>"
+				src="<?php echo esc_url( $image ); ?>"
+				alt="<?php echo esc_attr( get_the_title( $post ) ); ?>"
+				loading="lazy"
+			/>
+			<?php if ( $is_directory && $country !== '' ) : ?>
+				<span class="ef-card__flag"><?php echo esc_html( $country ); ?></span>
+			<?php endif; ?>
+		</div>
 		<div class="ef-card__body">
 			<?php if (! $is_directory && $cuisine !== '' ) : ?>
 				<p class="ef-card__meta"><?php echo esc_html( $cuisine ); ?></p>
