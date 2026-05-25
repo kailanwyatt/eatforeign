@@ -11,6 +11,8 @@ namespace EatForeignTheme;
 
 use EatForeign\Repositories\CommunityRepository;
 use EatForeign\Repositories\ModerationRepository;
+use EatForeign\Support\PassportPhoto;
+use EatForeign\Support\PostType;
 use WP_Error;
 
 final class Auth {
@@ -24,6 +26,7 @@ final class Auth {
 		add_action( 'admin_post_ef_update_notifications', [ self::class, 'handle_update_notifications' ] );
 		add_action( 'admin_post_ef_change_password', [ self::class, 'handle_change_password' ] );
 		add_action( 'admin_post_ef_rate_dish', [ self::class, 'handle_rate_dish' ] );
+		add_action( 'admin_post_ef_save_passport_entry', [ self::class, 'handle_save_passport_entry' ] );
 		add_action( 'admin_post_ef_toggle_celebration', [ self::class, 'handle_toggle_celebration' ] );
 		add_action( 'admin_post_ef_create_celebration_post', [ self::class, 'handle_create_celebration_post' ] );
 		add_action( 'admin_post_nopriv_ef_set_location', [ self::class, 'handle_set_location' ] );
@@ -161,6 +164,141 @@ final class Auth {
 
 		wp_safe_redirect( add_query_arg( 'updated', '1', home_url( '/account/security' ) ) );
 		exit;
+	}
+
+	public static function handle_save_passport_entry(): void {
+		self::verify_nonce( 'ef_save_passport_entry' );
+		self::require_user();
+
+		$dish_id  = absint( $_POST['dish_id'] ?? 0 );
+		$dish     = get_post( $dish_id );
+		$redirect = isset( $_POST['redirect_to'] ) ? esc_url_raw( (string) $_POST['redirect_to'] ) : '';
+
+		if ( $redirect === '' ) {
+			$redirect = $dish instanceof \WP_Post ? get_permalink( $dish ) : home_url( '/' );
+		}
+
+		$redirect = wp_validate_redirect( $redirect, home_url( '/' ) );
+
+		if ( ! $dish instanceof \WP_Post || $dish->post_type !== PostType::DISH ) {
+			self::redirect_with_error( $redirect, __( 'Dish not found.', 'eatforeign' ) );
+		}
+
+		$photos = self::collect_passport_photos_from_request();
+
+		$entry = CommunityRepository::upsert_passport_entry(
+			get_current_user_id(),
+			[
+				'dishId'          => $dish_id,
+				'rating'          => (float) ( $_POST['rating'] ?? 0 ),
+				'note'            => sanitize_textarea_field( (string) ( $_POST['note'] ?? '' ) ),
+				'triedOn'         => sanitize_text_field( (string) ( $_POST['tried_on'] ?? '' ) ),
+				'restaurantName'  => sanitize_text_field( (string) ( $_POST['restaurant_name'] ?? '' ) ),
+				'firstTimeTrying' => isset( $_POST['first_time_trying'] ),
+				'photos'          => $photos,
+			]
+		);
+
+		if ( $entry === null ) {
+			self::redirect_with_error( $redirect, __( 'Could not save passport entry.', 'eatforeign' ) );
+		}
+
+		$passport_url = home_url( '/dishes/' . $dish->post_name . '/passport' );
+		$passport_url = add_query_arg( 'stamped', '1', $passport_url );
+
+		if ( get_post_status( (int) ( $entry['postId'] ?? 0 ) ) === 'pending' ) {
+			$passport_url = add_query_arg( 'submitted', 'pending', $passport_url );
+		}
+
+		wp_safe_redirect( $passport_url );
+		exit;
+	}
+
+	/**
+	 * @return list<array{url: string, caption: string}>
+	 */
+	private static function collect_passport_photos_from_request(): array {
+		$existing_urls     = isset( $_POST['existing_photo_url'] ) && is_array( $_POST['existing_photo_url'] )
+			? array_map( 'esc_url_raw', wp_unslash( $_POST['existing_photo_url'] ) )
+			: [];
+		$existing_captions = isset( $_POST['existing_photo_caption'] ) && is_array( $_POST['existing_photo_caption'] )
+			? array_map( static fn ( mixed $value ): string => sanitize_textarea_field( (string) wp_unslash( (string) $value ) ), $_POST['existing_photo_caption'] )
+			: [];
+
+		$photos = [];
+
+		foreach ( $existing_urls as $index => $url ) {
+			if ( $url === '' ) {
+				continue;
+			}
+
+			$photos[] = [
+				'url'     => $url,
+				'caption' => (string) ( $existing_captions[ $index ] ?? '' ),
+			];
+		}
+
+		if ( ! isset( $_FILES['passport_images'] ) || ! is_array( $_FILES['passport_images'] ) ) {
+			return PassportPhoto::normalize_list( $photos );
+		}
+
+		$new_captions = isset( $_POST['new_photo_caption'] ) && is_array( $_POST['new_photo_caption'] )
+			? array_map( static fn ( mixed $value ): string => sanitize_textarea_field( (string) wp_unslash( (string) $value ) ), $_POST['new_photo_caption'] )
+			: [];
+
+		require_once ABSPATH . 'wp-admin/includes/file.php';
+		require_once ABSPATH . 'wp-admin/includes/image.php';
+		require_once ABSPATH . 'wp-admin/includes/media.php';
+
+		$files = $_FILES['passport_images'];
+
+		if ( isset( $files['name'] ) && is_array( $files['name'] ) ) {
+			foreach ( array_keys( $files['name'] ) as $index ) {
+				$file = [
+					'name'     => $files['name'][ $index ] ?? '',
+					'type'     => $files['type'][ $index ] ?? '',
+					'tmp_name' => $files['tmp_name'][ $index ] ?? '',
+					'error'    => $files['error'][ $index ] ?? UPLOAD_ERR_NO_FILE,
+					'size'     => $files['size'][ $index ] ?? 0,
+				];
+
+				if ( (int) ( $file['error'] ?? UPLOAD_ERR_NO_FILE ) !== UPLOAD_ERR_OK ) {
+					continue;
+				}
+
+				$attachment_id = media_handle_sideload( $file, 0 );
+
+				if ( is_wp_error( $attachment_id ) ) {
+					continue;
+				}
+
+				$url = (string) wp_get_attachment_url( (int) $attachment_id );
+
+				if ( $url === '' ) {
+					continue;
+				}
+
+				$photos[] = [
+					'url'     => $url,
+					'caption' => (string) ( $new_captions[ $index ] ?? '' ),
+				];
+			}
+		} elseif ( (int) ( $files['error'] ?? UPLOAD_ERR_NO_FILE ) === UPLOAD_ERR_OK ) {
+			$attachment_id = media_handle_sideload( $files, 0 );
+
+			if ( ! is_wp_error( $attachment_id ) ) {
+				$url = (string) wp_get_attachment_url( (int) $attachment_id );
+
+				if ( $url !== '' ) {
+					$photos[] = [
+						'url'     => $url,
+						'caption' => (string) ( $new_captions[0] ?? '' ),
+					];
+				}
+			}
+		}
+
+		return PassportPhoto::normalize_list( $photos );
 	}
 
 	public static function handle_rate_dish(): void {

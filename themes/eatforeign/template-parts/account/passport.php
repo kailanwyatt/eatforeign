@@ -66,11 +66,19 @@ $dish_pt = class_exists( '\EatForeign\Support\PostType' ) ? \EatForeign\Support\
 					$dish_url  = $dish_post instanceof \WP_Post ? get_permalink( $dish_post ) : home_url( '/directory' );
 					?>
 					<li class="ef-entry">
-						<a href="<?php echo esc_url( $dish_url ); ?>"><?php echo esc_html( $dish_slug ); ?></a>
+						<a href="<?php echo esc_url( $dish_url ); ?>"><?php echo esc_html( $dish_post instanceof \WP_Post ? $dish_post->post_title : $dish_slug ); ?></a>
 						<span class="ef-entry__rating"><?php echo esc_html( number_format( (float) ( $entry['rating'] ?? 0 ), 1 ) ); ?></span>
 						<?php if ( Data::has_text( $entry['note'] ?? '' ) ) : ?>
 							<p class="ef-entry__note"><?php echo esc_html( (string) $entry['note'] ); ?></p>
 						<?php endif; ?>
+						<?php
+						$photos = isset( $entry['photos'] ) && is_array( $entry['photos'] ) ? $entry['photos'] : [];
+						get_template_part(
+							'template-parts/passport-entry',
+							'photos',
+							[ 'photos' => $photos ]
+						);
+						?>
 					</li>
 				<?php endforeach; ?>
 			</ul>

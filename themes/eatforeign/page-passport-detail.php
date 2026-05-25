@@ -59,13 +59,29 @@ $is_owner = is_user_logged_in() && wp_get_current_user()->user_nicename === $pas
 			</header>
 			<div class="ef-section__content">
 				<ul class="ef-entry-list">
-					<?php foreach ( $passport['entries'] as $entry ) : ?>
+					<?php
+					$dish_pt = class_exists( '\EatForeign\Support\PostType' ) ? \EatForeign\Support\PostType::DISH : 'ef_dish';
+
+					foreach ( $passport['entries'] as $entry ) :
+						$dish_slug = (string) ( $entry['dishSlug'] ?? '' );
+						$dish_post = $dish_slug !== '' ? get_page_by_path( $dish_slug, OBJECT, $dish_pt ) : null;
+						$dish_url  = $dish_post instanceof \WP_Post ? get_permalink( $dish_post ) : home_url( '/directory' );
+						$dish_name = $dish_post instanceof \WP_Post ? $dish_post->post_title : $dish_slug;
+						$photos    = isset( $entry['photos'] ) && is_array( $entry['photos'] ) ? $entry['photos'] : [];
+						?>
 						<li class="ef-entry">
-							<a href="<?php echo esc_url( home_url( '/dishes/' . $entry['dishSlug'] ) ); ?>"><?php echo esc_html( (string) $entry['dishSlug'] ); ?></a>
-							<span><?php echo esc_html( number_format( (float) $entry['rating'], 1 ) ); ?></span>
+							<a href="<?php echo esc_url( $dish_url ); ?>"><?php echo esc_html( $dish_name ); ?></a>
+							<span class="ef-entry__rating"><?php echo esc_html( number_format( (float) ( $entry['rating'] ?? 0 ), 1 ) ); ?></span>
 							<?php if ( Data::has_text( $entry['note'] ?? '' ) ) : ?>
-								<p><?php echo esc_html( (string) $entry['note'] ); ?></p>
+								<p class="ef-entry__note"><?php echo esc_html( (string) $entry['note'] ); ?></p>
 							<?php endif; ?>
+							<?php
+							get_template_part(
+								'template-parts/passport-entry',
+								'photos',
+								[ 'photos' => $photos ]
+							);
+							?>
 						</li>
 					<?php endforeach; ?>
 				</ul>

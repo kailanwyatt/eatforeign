@@ -12,7 +12,7 @@ namespace EatForeignTheme;
 final class Routes {
 	private const QUERY_VAR = 'ef_page';
 
-	private const REWRITE_VERSION = '5';
+	private const REWRITE_VERSION = '6';
 
 	/** @var list<string> */
 	private const STATIC_ROUTES = [
@@ -34,6 +34,7 @@ final class Routes {
 	public static function register_query_vars( array $vars ): array {
 		$vars[] = self::QUERY_VAR;
 		$vars[] = 'ef_passport_slug';
+		$vars[] = 'ef_dish_slug';
 		$vars[] = 'ef_account_tab';
 
 		return $vars;
@@ -65,6 +66,12 @@ final class Routes {
 			'top'
 		);
 
+		add_rewrite_rule(
+			'^dishes/([^/]+)/passport/?$',
+			'index.php?' . self::QUERY_VAR . '=dish-passport&ef_dish_slug=$matches[1]',
+			'top'
+		);
+
 		$stored = get_option( 'eatforeign_theme_rewrite_ver' );
 
 		if ( $stored !== self::REWRITE_VERSION ) {
@@ -93,6 +100,7 @@ final class Routes {
 			'calendar'        => 'page-calendar.php',
 			'directory'       => 'page-directory.php',
 			'countries'       => 'page-countries.php',
+			'dish-passport'   => 'page-dish-passport.php',
 		];
 
 		if (! isset( $map[ $page ] ) ) {

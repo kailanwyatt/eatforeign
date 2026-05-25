@@ -29,6 +29,9 @@ while ( have_posts() ) :
 	$spice_levels     = Data::post_term_names( $dish_id, 'ef_spice_level' );
 	$rating           = (float) get_post_meta( $dish_id, 'ef_average_rating', true );
 	$nearby           = Places::nearby_for_dish( get_the_title() );
+	$passport_photos  = Data::passport_photos_for_dish( $dish_id );
+	$passport_entry   = is_user_logged_in() ? Data::user_passport_entry_for_dish( $dish_id ) : null;
+	$passport_url     = home_url( '/dishes/' . get_post_field( 'post_name', $dish_id ) . '/passport' );
 	?>
 	<div class="ef-shell ef-dish-page">
 		<article <?php post_class( 'ef-dish-hero' ); ?>>
@@ -130,6 +133,19 @@ while ( have_posts() ) :
 					Template::panel( __( 'About this dish', 'eatforeign' ), $content );
 				}
 
+				if ( $passport_photos !== [] ) {
+					ob_start();
+					get_template_part(
+						'template-parts/dish',
+						'passport-gallery',
+						[ 'photos' => $passport_photos ]
+					);
+					Template::panel(
+						__( 'From the community', 'eatforeign' ),
+						(string) ob_get_clean()
+					);
+				}
+
 				Template::section(
 					__( 'Linked celebrations', 'eatforeign' ),
 					$linked,
@@ -200,23 +216,42 @@ while ( have_posts() ) :
 				<?php endif; ?>
 
 				<section class="ef-sidebar-card">
-					<h2 class="ef-sidebar-card__title"><?php esc_html_e( 'Rate this dish', 'eatforeign' ); ?></h2>
+					<h2 class="ef-sidebar-card__title"><?php esc_html_e( 'My passport', 'eatforeign' ); ?></h2>
 					<?php if ( is_user_logged_in() ) : ?>
-						<?php $current_rating = Data::user_rating_for_dish( $dish_id ); ?>
-						<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" class="ef-form ef-form--compact">
-							<?php wp_nonce_field( 'ef_rate_dish' ); ?>
-							<input type="hidden" name="action" value="ef_rate_dish" />
-							<input type="hidden" name="dish_id" value="<?php echo esc_attr( (string) $dish_id ); ?>" />
-							<label class="ef-field">
-								<span><?php esc_html_e( 'Your rating', 'eatforeign' ); ?></span>
-								<input type="number" name="rating" min="0" max="5" step="0.1" value="<?php echo esc_attr( (string) $current_rating ); ?>" required />
-							</label>
-							<button type="submit" class="ef-button ef-button--primary ef-button--block"><?php esc_html_e( 'Save rating', 'eatforeign' ); ?></button>
-						</form>
+						<?php if ( is_array( $passport_entry ) ) : ?>
+							<p class="ef-sidebar-card__intro">
+								<?php
+								echo esc_html(
+									sprintf(
+										/* translators: %s: rating */
+										__( 'You rated this dish %s.', 'eatforeign' ),
+										number_format( (float) ( $passport_entry['rating'] ?? 0 ), 1 )
+									)
+								);
+								?>
+							</p>
+							<?php
+							$my_photos = isset( $passport_entry['photos'] ) && is_array( $passport_entry['photos'] ) ? $passport_entry['photos'] : [];
+							if ( $my_photos !== [] ) {
+								get_template_part(
+									'template-parts/passport-entry',
+									'photos',
+									[ 'photos' => $my_photos ]
+								);
+							}
+							?>
+						<?php else : ?>
+							<p class="ef-sidebar-card__intro"><?php esc_html_e( 'Stamp your passport in a quick 3-step flow — photos, vibes, all optional.', 'eatforeign' ); ?></p>
+						<?php endif; ?>
+						<p class="ef-form-footer">
+							<a class="ef-button ef-button--primary ef-button--block" href="<?php echo esc_url( $passport_url ); ?>">
+								<?php echo is_array( $passport_entry ) ? esc_html__( 'Update my stamp', 'eatforeign' ) : esc_html__( 'Stamp my passport', 'eatforeign' ); ?>
+							</a>
+						</p>
 					<?php else : ?>
 						<p class="ef-sidebar-card__intro">
-							<a href="<?php echo esc_url( home_url( '/login' ) ); ?>"><?php esc_html_e( 'Log in', 'eatforeign' ); ?></a>
-							<?php esc_html_e( 'to rate this dish.', 'eatforeign' ); ?>
+							<a href="<?php echo esc_url( add_query_arg( 'redirect_to', rawurlencode( $passport_url ), home_url( '/login' ) ) ); ?>"><?php esc_html_e( 'Log in', 'eatforeign' ); ?></a>
+							<?php esc_html_e( 'to add this dish to your passport.', 'eatforeign' ); ?>
 						</p>
 					<?php endif; ?>
 				</section>

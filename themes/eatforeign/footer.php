@@ -46,7 +46,7 @@ declare(strict_types=1);
 	<div class="ef-shell ef-site-footer__bottom">
 		<p class="ef-site-footer__copy">
 			&copy; <?php echo esc_html( wp_date( 'Y' ) ); ?> <?php bloginfo( 'name' ); ?>.
-			<?php esc_html_e( 'Demo prototype with catalog content from the EatForeign plugin.', 'eatforeign' ); ?>
+			<?php esc_html_e( 'All rights reserved.', 'eatforeign' ); ?>
 		</p>
 	</div>
 </footer>

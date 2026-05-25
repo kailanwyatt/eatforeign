@@ -351,6 +351,36 @@ final class Data {
 		return PassportRepository::get_by_slug( $slug, get_current_user_id() );
 	}
 
+	/**
+	 * @return list<array<string, mixed>>
+	 */
+	public static function passport_photos_for_dish( int $dish_id ): array {
+		if ( ! self::plugin_ready() || ! class_exists( CommunityRepository::class ) || $dish_id <= 0 ) {
+			return [];
+		}
+
+		$user_id = get_current_user_id();
+
+		return CommunityRepository::get_passport_photos_for_dish(
+			$dish_id,
+			$user_id > 0 ? $user_id : null,
+			true
+		);
+	}
+
+	/**
+	 * @return array<string, mixed>|null
+	 */
+	public static function user_passport_entry_for_dish( int $dish_id ): ?array {
+		$user_id = get_current_user_id();
+
+		if ( ! self::plugin_ready() || ! class_exists( CommunityRepository::class ) || $user_id <= 0 || $dish_id <= 0 ) {
+			return null;
+		}
+
+		return CommunityRepository::get_user_passport_entry_for_dish( $user_id, $dish_id );
+	}
+
 	public static function user_rating_for_dish( int $dish_id ): float {
 		$user_id = get_current_user_id();
 

@@ -50,6 +50,16 @@ final class Theme {
 			[ 'eatforeign-fonts' ],
 			self::asset_version( 'theme.css' )
 		);
+
+		if ( Helpers::current_ef_route() === 'dish-passport' ) {
+			wp_enqueue_script(
+				'eatforeign-passport-wizard',
+				get_template_directory_uri() . '/assets/passport-wizard.js',
+				[],
+				self::asset_version( 'passport-wizard.js' ),
+				true
+			);
+		}
 	}
 
 	public static function render_favicon(): void {
