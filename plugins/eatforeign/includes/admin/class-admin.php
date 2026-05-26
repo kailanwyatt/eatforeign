@@ -10,6 +10,7 @@ declare(strict_types=1);
 namespace EatForeign\Admin;
 
 use EatForeign\Repositories\ModerationRepository;
+use EatForeign\Support\DishImageStatus;
 use EatForeign\Support\ImageAttribution;
 use EatForeign\Support\PostType;
 
@@ -21,10 +22,12 @@ final class Admin {
 		add_action('manage_' . PostType::CELEBRATION . '_posts_custom_column', [ self::class, 'render_celebration_column' ], 10, 2 );
 
 		// Moderation columns
-		add_filter('manage_' . PostType::DISH . '_posts_columns', [ self::class, 'review_status_column' ] );
-		add_action('manage_' . PostType::DISH . '_posts_custom_column', [ self::class, 'render_review_status_column' ], 10, 2 );
+		add_filter('manage_' . PostType::DISH . '_posts_columns', [ self::class, 'dish_list_columns' ] );
+		add_action('manage_' . PostType::DISH . '_posts_custom_column', [ self::class, 'render_dish_list_column' ], 10, 2 );
 		add_filter('manage_' . PostType::CELEBRATION . '_posts_columns', [ self::class, 'review_status_column' ] );
 		add_action('manage_' . PostType::CELEBRATION . '_posts_custom_column', [ self::class, 'render_review_status_column' ], 10, 2 );
+		add_filter( 'views_edit-' . PostType::DISH, [ self::class, 'dish_list_views' ] );
+		add_action( 'pre_get_posts', [ self::class, 'filter_dish_list_by_needs_image' ] );
 
 		// AJAX and Scripts
 		add_action('admin_enqueue_scripts', [ self::class, 'enqueue_scripts' ] );
@@ -33,8 +36,12 @@ final class Admin {
 		add_action( 'set_post_thumbnail', [ self::class, 'sync_featured_attribution_from_thumbnail' ], 10, 2 );
 
 		add_action('admin_menu', [ self::class, 'register_tools_page' ] );
+		add_action('admin_menu', [ self::class, 'register_publish_dishes_tools_page' ] );
 		add_action('admin_post_ef_remove_imported_mock_data', [ self::class, 'handle_remove_imported_mock_data' ] );
+		add_action( 'admin_post_ef_publish_all_draft_dishes', [ self::class, 'handle_publish_all_draft_dishes' ] );
+		add_action( 'admin_post_ef_scan_dish_images', [ self::class, 'handle_scan_dish_images' ] );
 		add_action('admin_notices', [ self::class, 'maybe_show_imported_mock_data_notice' ] );
+		add_action( 'admin_notices', [ self::class, 'maybe_show_publish_dishes_notice' ] );
 
 		add_filter( 'manage_' . PostType::CELEBRATION_POST . '_posts_columns', [ self::class, 'community_moderation_columns' ] );
 		add_action( 'manage_' . PostType::CELEBRATION_POST . '_posts_custom_column', [ self::class, 'render_community_moderation_column' ], 10, 2 );
@@ -359,6 +366,7 @@ final class Admin {
 			array_filter(
 				$suggested_sources,
 				static fn( array $source ): bool => ( $source['sourceType'] ?? '' ) === ImageAttribution::TYPE_WIKIMEDIA
+					&& ImageAttribution::is_image_record( $source )
 			)
 		);
 
@@ -536,6 +544,80 @@ final class Admin {
 		}
 	}
 
+	/**
+	 * @param array<string, string> $columns
+	 * @return array<string, string>
+	 */
+	public static function dish_list_columns( array $columns ): array {
+		$columns = self::review_status_column( $columns );
+
+		$with_image = [];
+		foreach ( $columns as $key => $title ) {
+			$with_image[ $key ] = $title;
+			if ( $key === 'ef_review_status' ) {
+				$with_image['ef_image_status'] = __( 'Image', 'eatforeign' );
+			}
+		}
+
+		return $with_image;
+	}
+
+	public static function render_dish_list_column( string $column, int $post_id ): void {
+		if ( $column === 'ef_review_status' || $column === 'ef_image_status' ) {
+			self::render_review_status_column( $column, $post_id );
+			return;
+		}
+	}
+
+	/**
+	 * @param array<string, string> $views
+	 * @return array<string, string>
+	 */
+	public static function dish_list_views( array $views ): array {
+		$count = DishImageStatus::count_needs_image();
+		if ( $count <= 0 ) {
+			return $views;
+		}
+
+		$current = isset( $_GET['ef_needs_image'] ) && sanitize_key( wp_unslash( (string) $_GET['ef_needs_image'] ) ) === '1';
+		$class   = $current ? 'current' : '';
+
+		$views['ef_needs_image'] = sprintf(
+			'<a href="%1$s" class="%2$s">%3$s <span class="count">(%4$d)</span></a>',
+			esc_url( DishImageStatus::needs_image_filter_url() ),
+			esc_attr( $class ),
+			esc_html__( 'Needs image', 'eatforeign' ),
+			$count
+		);
+
+		return $views;
+	}
+
+	public static function filter_dish_list_by_needs_image( \WP_Query $query ): void {
+		if ( ! is_admin() || ! $query->is_main_query() ) {
+			return;
+		}
+
+		$screen = function_exists( 'get_current_screen' ) ? get_current_screen() : null;
+		if ( ! $screen || $screen->id !== 'edit-' . PostType::DISH ) {
+			return;
+		}
+
+		if ( ! isset( $_GET['ef_needs_image'] ) || sanitize_key( wp_unslash( (string) $_GET['ef_needs_image'] ) ) !== '1' ) {
+			return;
+		}
+
+		$query->set(
+			'meta_query',
+			[
+				[
+					'key'   => DishImageStatus::META_KEY,
+					'value' => '1',
+				],
+			]
+		);
+	}
+
 	public static function review_status_column( array $columns ): array {
 		$new_columns = [];
 		foreach ( $columns as $key => $title ) {
@@ -556,6 +638,25 @@ final class Admin {
 				echo '<span style="display:inline-block;padding:3px 8px;background:#46b450;color:#fff;border-radius:3px;font-weight:bold;font-size:11px;">Published</span>';
 			} else {
 				echo esc_html( ucfirst( $status ) );
+			}
+			return;
+		}
+
+		if ( $column === 'ef_image_status' ) {
+			if ( has_post_thumbnail( $post_id ) ) {
+				echo '<span style="display:inline-block;padding:3px 8px;background:#46b450;color:#fff;border-radius:3px;font-weight:bold;font-size:11px;">';
+				esc_html_e( 'OK', 'eatforeign' );
+				echo '</span>';
+			} else {
+				echo '<span style="display:inline-block;padding:3px 8px;background:#f0c24b;color:#000;border-radius:3px;font-weight:bold;font-size:11px;">';
+				esc_html_e( 'Needs image', 'eatforeign' );
+				echo '</span>';
+			}
+
+			if ( DishImageStatus::has_suggested_sources( $post_id ) ) {
+				echo '<br /><span style="font-size:11px;color:#646970;">';
+				esc_html_e( 'Has suggestions', 'eatforeign' );
+				echo '</span>';
 			}
 		}
 	}
@@ -578,6 +679,212 @@ final class Admin {
 			'textarea_rows' => 8,
 			'teeny'         => true,
 		] );
+	}
+
+	public static function register_publish_dishes_tools_page(): void {
+		add_management_page(
+			__( 'Publish dishes', 'eatforeign' ),
+			__( 'Publish dishes', 'eatforeign' ),
+			'manage_options',
+			'eatforeign-publish-dishes',
+			[ self::class, 'render_publish_dishes_tools_page' ]
+		);
+	}
+
+	public static function render_publish_dishes_tools_page(): void {
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_die( esc_html__( 'You do not have permission to publish dishes.', 'eatforeign' ) );
+		}
+
+		$draft_count       = DishImageStatus::count_draft_dishes();
+		$draft_no_thumb    = DishImageStatus::count_draft_dishes_without_thumbnail();
+		$needs_image_count = DishImageStatus::count_needs_image();
+		$filter_url        = DishImageStatus::needs_image_filter_url();
+		?>
+		<div class="wrap">
+			<h1><?php echo esc_html__( 'Publish dishes', 'eatforeign' ); ?></h1>
+			<p><?php echo esc_html__( 'Publish all draft dishes for go-live. Dishes without a featured image are flagged so you can find and fix them later.', 'eatforeign' ); ?></p>
+
+			<h2><?php echo esc_html__( 'Current status', 'eatforeign' ); ?></h2>
+			<ul>
+				<li><?php echo esc_html( sprintf( __( 'Draft dishes: %d', 'eatforeign' ), $draft_count ) ); ?></li>
+				<li><?php echo esc_html( sprintf( __( 'Draft dishes without a featured image: %d', 'eatforeign' ), $draft_no_thumb ) ); ?></li>
+				<li>
+					<?php
+					echo esc_html( sprintf( __( 'Published dishes flagged as needing an image: %d', 'eatforeign' ), $needs_image_count ) );
+					if ( $needs_image_count > 0 ) {
+						echo ' — <a href="' . esc_url( $filter_url ) . '">' . esc_html__( 'View in dish list', 'eatforeign' ) . '</a>';
+					}
+					?>
+				</li>
+			</ul>
+
+			<p class="description">
+				<?php echo esc_html__( 'Publishing a dish also publishes linked draft celebrations and country hub pages when applicable.', 'eatforeign' ); ?>
+			</p>
+
+			<h2><?php echo esc_html__( 'Go live', 'eatforeign' ); ?></h2>
+			<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" style="margin-bottom:24px;">
+				<?php wp_nonce_field( 'ef_publish_all_draft_dishes' ); ?>
+				<input type="hidden" name="action" value="ef_publish_all_draft_dishes" />
+				<?php
+				$publish_attrs = [];
+				if ( $draft_count === 0 ) {
+					$publish_attrs['disabled'] = 'disabled';
+				} else {
+					$publish_attrs['onclick'] = "return confirm('" . esc_js(
+						sprintf(
+							/* translators: 1: draft count, 2: count without featured image */
+							__( 'Publish %1$d draft dishes? %2$d of them have no featured image and will be flagged for follow-up.', 'eatforeign' ),
+							$draft_count,
+							$draft_no_thumb
+						)
+					) . "');";
+				}
+				submit_button(
+					__( 'Publish all draft dishes', 'eatforeign' ),
+					'primary',
+					'submit',
+					false,
+					$publish_attrs
+				);
+				?>
+			</form>
+
+			<h2><?php echo esc_html__( 'Backfill image flags', 'eatforeign' ); ?></h2>
+			<p class="description"><?php echo esc_html__( 'Scan all already-published dishes and update the “needs image” flag. Safe to run multiple times.', 'eatforeign' ); ?></p>
+			<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
+				<?php wp_nonce_field( 'ef_scan_dish_images' ); ?>
+				<input type="hidden" name="action" value="ef_scan_dish_images" />
+				<?php submit_button( __( 'Scan published dishes for missing images', 'eatforeign' ), 'secondary', 'submit', false ); ?>
+			</form>
+		</div>
+		<?php
+	}
+
+	public static function handle_publish_all_draft_dishes(): void {
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_die( esc_html__( 'You do not have permission to publish dishes.', 'eatforeign' ) );
+		}
+
+		check_admin_referer( 'ef_publish_all_draft_dishes' );
+
+		$result = DishImageStatus::publish_all_draft_dishes();
+
+		wp_safe_redirect(
+			add_query_arg(
+				[
+					'page'               => 'eatforeign-publish-dishes',
+					'ef_dish_notice'     => 'published',
+					'ef_published'       => (string) $result['published'],
+					'ef_needs_image_new' => (string) $result['needs_image'],
+				],
+				admin_url( 'tools.php' )
+			)
+		);
+		exit;
+	}
+
+	public static function handle_scan_dish_images(): void {
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_die( esc_html__( 'You do not have permission to scan dish images.', 'eatforeign' ) );
+		}
+
+		check_admin_referer( 'ef_scan_dish_images' );
+
+		$result = DishImageStatus::scan_all_published_dishes();
+
+		wp_safe_redirect(
+			add_query_arg(
+				[
+					'page'           => 'eatforeign-publish-dishes',
+					'ef_dish_notice' => 'scanned',
+					'ef_scanned'     => (string) $result['scanned'],
+					'ef_flagged'     => (string) $result['flagged'],
+					'ef_cleared'     => (string) $result['cleared'],
+				],
+				admin_url( 'tools.php' )
+			)
+		);
+		exit;
+	}
+
+	public static function maybe_show_publish_dishes_notice(): void {
+		if ( ! current_user_can( 'manage_options' ) ) {
+			return;
+		}
+
+		if ( ! isset( $_GET['page'] ) || sanitize_key( wp_unslash( (string) $_GET['page'] ) ) !== 'eatforeign-publish-dishes' ) {
+			return;
+		}
+
+		if ( ! isset( $_GET['ef_dish_notice'] ) ) {
+			return;
+		}
+
+		$notice = sanitize_key( wp_unslash( (string) $_GET['ef_dish_notice'] ) );
+
+		if ( $notice === 'published' ) {
+			$published   = absint( $_GET['ef_published'] ?? 0 );
+			$needs_image = absint( $_GET['ef_needs_image_new'] ?? 0 );
+			$filter_url  = DishImageStatus::needs_image_filter_url();
+
+			echo '<div class="notice notice-success is-dismissible"><p>';
+			echo esc_html(
+				sprintf(
+					/* translators: %d: number of dishes published */
+					_n(
+						'Published %d dish.',
+						'Published %d dishes.',
+						$published,
+						'eatforeign'
+					),
+					$published
+				)
+			);
+			if ( $needs_image > 0 ) {
+				echo ' ';
+				$needs_image_message = sprintf(
+					/* translators: 1: count needing image, 2: admin filter URL */
+					_n(
+						'<a href="%2$s">%1$d dish</a> still needs a featured image.',
+						'<a href="%2$s">%1$d dishes</a> still need a featured image.',
+						$needs_image,
+						'eatforeign'
+					),
+					$needs_image,
+					esc_url( $filter_url )
+				);
+				echo wp_kses(
+					$needs_image_message,
+					[
+						'a' => [
+							'href' => [],
+						],
+					]
+				);
+			}
+			echo '</p></div>';
+			return;
+		}
+
+		if ( $notice === 'scanned' ) {
+			$scanned = absint( $_GET['ef_scanned'] ?? 0 );
+			$flagged = absint( $_GET['ef_flagged'] ?? 0 );
+			$cleared = absint( $_GET['ef_cleared'] ?? 0 );
+
+			echo '<div class="notice notice-success is-dismissible"><p>';
+			echo esc_html(
+				sprintf(
+					/* translators: 1: scanned count, 2: newly flagged, 3: flags cleared */
+					__( 'Scanned %1$d published dishes. Newly flagged: %2$d. Cleared: %3$d.', 'eatforeign' ),
+					$scanned,
+					$flagged,
+					$cleared
+				)
+			);
+			echo '</p></div>';
+		}
 	}
 
 	public static function register_tools_page(): void {

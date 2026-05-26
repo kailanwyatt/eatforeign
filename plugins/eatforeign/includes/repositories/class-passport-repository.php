@@ -9,6 +9,7 @@ declare(strict_types=1);
 
 namespace EatForeign\Repositories;
 
+use EatForeign\Support\PassportPhoto;
 use EatForeign\Support\PostType;
 use WP_Post;
 use WP_User;
@@ -75,8 +76,6 @@ final class PassportRepository {
 		}
 
 		$entries = self::build_entries( $user->ID, $include_private_entries );
-		$completed = get_user_meta( $user->ID, 'ef_completed_celebration_ids', true );
-		$completed = is_array( $completed ) ? $completed : [];
 
 		return [
 			'slug'                  => $user->user_nicename,
@@ -85,13 +84,13 @@ final class PassportRepository {
 			'bio'                   => (string) get_user_meta( $user->ID, 'ef_bio', true ),
 			'countriesExplored'     => self::count_countries_explored( $entries ),
 			'dishesTried'           => count( $entries ),
-			'celebrationsCompleted' => count( $completed ),
+			'celebrationsCompleted' => CommunityRepository::count_completed_celebrations_for_user( $user->ID ),
 			'entries'               => $entries,
 		];
 	}
 
 	/**
-	 * @return list<array{dishSlug: string, rating: float, triedOn: string, note: string}>
+	 * @return list<array<string, mixed>>
 	 */
 	private static function build_entries( int $user_id, bool $include_private_entries ): array {
 		$ratings  = get_user_meta( $user_id, 'ef_dish_ratings', true );
@@ -107,14 +106,20 @@ final class PassportRepository {
 				continue;
 			}
 
-			$meta = is_array( $activity[ $dish_id ] ?? null ) ? $activity[ $dish_id ] : [];
-			$note = self::latest_post_note_for_dish( $user_id, (int) $dish_id, $include_private_entries );
+			$meta   = is_array( $activity[ $dish_id ] ?? null ) ? $activity[ $dish_id ] : [];
+			$note   = self::latest_post_note_for_dish( $user_id, (int) $dish_id, $include_private_entries );
+			$post   = self::latest_post_for_dish( $user_id, (int) $dish_id, $include_private_entries );
+			$photos = $post instanceof WP_Post ? PassportPhoto::get_for_post( $post->ID ) : [];
 
 			$entries[] = [
 				'dishSlug' => $dish->post_name,
+				'dishId'   => (int) $dish_id,
 				'rating'   => (float) $rating,
 				'triedOn'  => (string) ( $meta['triedOn'] ?? current_time( 'Y-m-d' ) ),
 				'note'     => $note !== '' ? $note : (string) ( $meta['note'] ?? '' ),
+				'photos'   => $photos,
+				'imageUrl' => PassportPhoto::first_url( $photos ),
+				'postId'   => $post instanceof WP_Post ? $post->ID : 0,
 			];
 		}
 
@@ -126,7 +131,7 @@ final class PassportRepository {
 		return $entries;
 	}
 
-	private static function latest_post_note_for_dish( int $user_id, int $dish_id, bool $include_private_entries ): string {
+	private static function latest_post_for_dish( int $user_id, int $dish_id, bool $include_private_entries ): ?WP_Post {
 		$posts = get_posts(
 			[
 				'post_type'      => PostType::CELEBRATION_POST,
@@ -145,12 +150,22 @@ final class PassportRepository {
 		);
 
 		if ( $posts === [] ) {
-			return '';
+			return null;
 		}
 
 		$post = $posts[0];
 
-		if (! $include_private_entries && ! ModerationRepository::is_publicly_visible_post( $post ) ) {
+		if ( ! $include_private_entries && ! ModerationRepository::is_publicly_visible_post( $post ) ) {
+			return null;
+		}
+
+		return $post;
+	}
+
+	private static function latest_post_note_for_dish( int $user_id, int $dish_id, bool $include_private_entries ): string {
+		$post = self::latest_post_for_dish( $user_id, $dish_id, $include_private_entries );
+
+		if ( ! $post instanceof WP_Post ) {
 			return '';
 		}
 

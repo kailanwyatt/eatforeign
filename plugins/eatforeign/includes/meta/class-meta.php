@@ -9,7 +9,9 @@ declare(strict_types=1);
 
 namespace EatForeign\Meta;
 
+use EatForeign\Support\DishImageStatus;
 use EatForeign\Support\ImageAttribution;
+use EatForeign\Support\PassportPhoto;
 use EatForeign\Support\PostType;
 use EatForeign\Support\Sanitizer;
 
@@ -46,6 +48,12 @@ final class Meta {
 		self::register_post_meta( PostType::DISH, 'ef_suggested_images', [ Sanitizer::class, 'string_list' ], 'array' );
 		self::register_post_meta_without_rest( PostType::DISH, 'ef_suggested_image_sources', [ ImageAttribution::class, 'sanitize_meta_list' ], 'array' );
 		self::register_post_meta_without_rest( PostType::DISH, 'ef_featured_image_attribution', [ ImageAttribution::class, 'sanitize_meta_record' ], 'array' );
+		self::register_post_meta_without_rest(
+			PostType::DISH,
+			DishImageStatus::META_KEY,
+			static fn ( mixed $value ): string => $value === '1' ? '1' : '',
+			'string'
+		);
 		self::register_post_meta( PostType::DISH, 'ef_average_rating', static fn ( mixed $value ): float => round( (float) $value, 1 ), 'number' );
 		self::register_post_meta( PostType::DISH, 'ef_eat_yes_count', static fn ( mixed $value ): int => max( 0, (int) $value ), 'integer' );
 		self::register_post_meta( PostType::DISH, 'ef_eat_total_count', static fn ( mixed $value ): int => max( 0, (int) $value ), 'integer' );
@@ -80,6 +88,8 @@ final class Meta {
 		self::register_post_meta( PostType::CELEBRATION_POST, 'ef_caption', [ Sanitizer::class, 'textarea' ], 'string' );
 		self::register_post_meta( PostType::CELEBRATION_POST, 'ef_rating', static fn ( mixed $value ): float => round( (float) $value, 1 ), 'number' );
 		self::register_post_meta( PostType::CELEBRATION_POST, 'ef_image_url', [ Sanitizer::class, 'url' ], 'string' );
+		self::register_post_meta_without_rest( PostType::CELEBRATION_POST, 'ef_passport_photos', [ PassportPhoto::class, 'normalize_list' ], 'array' );
+		self::register_post_meta_without_rest( PostType::CELEBRATION_POST, 'ef_gallery_urls', [ Sanitizer::class, 'string_list' ], 'array' );
 		self::register_post_meta( PostType::CELEBRATION_POST, 'ef_restaurant_name', [ Sanitizer::class, 'text' ], 'string' );
 		self::register_post_meta( PostType::CELEBRATION_POST, 'ef_first_time_trying', static fn ( mixed $value ): bool => (bool) $value, 'boolean' );
 		self::register_post_meta( PostType::CELEBRATION_POST, 'ef_visibility', [ Sanitizer::class, 'text' ], 'string' );

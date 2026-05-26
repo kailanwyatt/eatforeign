@@ -17,9 +17,10 @@ final class ImageClient {
 	 */
 	public static function search_images( string $query ): array {
 		Logger::log( "ImageClient: Searching Wikimedia Commons for '{$query}'..." );
-		$url = 'https://commons.wikimedia.org/w/api.php?action=query&format=json&generator=search'
-			. '&gsrnamespace=6&gsrsearch=' . rawurlencode( $query )
-			. '&gsrlimit=5&prop=imageinfo&iiprop=url|extmetadata';
+		$search_query = trim( $query ) . ' filetype:bitmap|drawing';
+		$url          = 'https://commons.wikimedia.org/w/api.php?action=query&format=json&generator=search'
+			. '&gsrnamespace=6&gsrsearch=' . rawurlencode( $search_query )
+			. '&gsrlimit=10&prop=imageinfo&iiprop=url|extmetadata|mime';
 
 		$response = wp_remote_get( $url, [ 'timeout' => 15 ] );
 
@@ -45,7 +46,13 @@ final class ImageClient {
 				continue;
 			}
 
-			$img_url = (string) $imageinfo['url'];
+			$img_url    = (string) $imageinfo['url'];
+			$mime       = (string) ( $imageinfo['mime'] ?? '' );
+			$file_title = (string) ( $page['title'] ?? '' );
+
+			if ( ! self::is_commons_image_file( $img_url, $mime, $file_title ) ) {
+				continue;
+			}
 			$img_response = wp_remote_head( $img_url, [ 'timeout' => 5 ] );
 			if ( is_wp_error( $img_response ) || wp_remote_retrieve_response_code( $img_response ) !== 200 ) {
 				continue;
@@ -74,12 +81,31 @@ final class ImageClient {
 				$credit_page,
 				self::meta_value( $meta, 'LicenseUrl' )
 			);
+
+			if ( count( $images ) >= 5 ) {
+				break;
+			}
 		}
 
 		$count = count( $images );
 		Logger::log( "ImageClient: SUCCESS. Found {$count} images with attribution metadata." );
 
 		return $images;
+	}
+
+	/**
+	 * @param array<string, mixed> $meta
+	 */
+	private static function is_commons_image_file( string $url, string $mime, string $file_title ): bool {
+		if ( ! ImageAttribution::is_image_url( $url, $mime ) ) {
+			return false;
+		}
+
+		if ( preg_match( '/\.(pdf|djvu|djv|ogg|ogv|webm|mp4|mp3)(\s|$)/i', $file_title ) ) {
+			return false;
+		}
+
+		return true;
 	}
 
 	/**

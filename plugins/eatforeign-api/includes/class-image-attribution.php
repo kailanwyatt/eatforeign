@@ -38,4 +38,25 @@ final class ImageAttribution {
 			'license'    => 'AI generated',
 		];
 	}
+
+	/**
+	 * Whether a remote file URL (and optional MIME) is a displayable image.
+	 */
+	public static function is_image_url( string $url, string $mime = '' ): bool {
+		$mime = strtolower( trim( $mime ) );
+
+		if ( $mime !== '' ) {
+			return str_starts_with( $mime, 'image/' );
+		}
+
+		$blocked = [ 'pdf', 'djvu', 'djv', 'ogg', 'ogv', 'ogm', 'webm', 'mp4', 'mp3', 'wav', 'flac', 'mid', 'midi', 'swf', 'zip' ];
+		$path    = (string) wp_parse_url( $url, PHP_URL_PATH );
+		$ext     = strtolower( pathinfo( $path, PATHINFO_EXTENSION ) );
+
+		if ( $ext !== '' && in_array( $ext, $blocked, true ) ) {
+			return false;
+		}
+
+		return ! preg_match( '/\.(pdf|djvu|djv|ogg|ogv|webm|mp4|mp3)(\?|$)/i', $url );
+	}
 }

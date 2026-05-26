@@ -732,6 +732,12 @@ final class ContentGenerator {
 			if ( ! is_array( $source ) || empty( $source['url'] ) ) {
 				continue;
 			}
+
+			$url = esc_url_raw( (string) $source['url'] );
+			if ( $url === '' || ! ImageAttribution::is_image_url( $url ) ) {
+				continue;
+			}
+
 			$normalized[] = [
 				'url'           => esc_url_raw( (string) $source['url'] ),
 				'sourceType'    => sanitize_key( (string) ( $source['sourceType'] ?? 'remote' ) ),

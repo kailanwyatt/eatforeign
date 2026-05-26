@@ -132,6 +132,53 @@ final class Mutations {
 		);
 
 		register_graphql_mutation(
+			'upsertPassportEntry',
+			[
+				'inputFields'         => [
+					'dishId'          => [ 'type' => [ 'non_null' => 'Int' ] ],
+					'rating'          => [ 'type' => 'Float' ],
+					'note'            => [ 'type' => 'String' ],
+					'triedOn'         => [ 'type' => 'String' ],
+					'restaurantName'  => [ 'type' => 'String' ],
+					'firstTimeTrying' => [ 'type' => 'Boolean' ],
+					'celebrationId'   => [ 'type' => 'Int' ],
+					'photos'          => [ 'type' => [ 'list_of' => 'EatForeignPassportPhotoInput' ] ],
+				],
+				'outputFields'        => [
+					'entry'  => [ 'type' => 'EatForeignPassportEntry' ],
+					'postId' => [ 'type' => 'Int' ],
+					'isNew'  => [ 'type' => 'Boolean' ],
+				],
+				'mutateAndGetPayload' => static function ( array $input ): array {
+					self::require_user();
+					$entry = CommunityRepository::upsert_passport_entry(
+						get_current_user_id(),
+						[
+							'dishId'          => (int) $input['dishId'],
+							'rating'          => (float) ( $input['rating'] ?? 0 ),
+							'note'            => (string) ( $input['note'] ?? '' ),
+							'triedOn'         => (string) ( $input['triedOn'] ?? '' ),
+							'restaurantName'  => (string) ( $input['restaurantName'] ?? '' ),
+							'firstTimeTrying' => (bool) ( $input['firstTimeTrying'] ?? false ),
+							'celebrationId'   => (int) ( $input['celebrationId'] ?? 0 ),
+							'photos'          => is_array( $input['photos'] ?? null ) ? $input['photos'] : [],
+						]
+					);
+
+					if ( $entry === null ) {
+						throw new \GraphQL\Error\UserError( 'Could not save passport entry.' );
+					}
+
+					return [
+						'entry'  => $entry,
+						'postId' => (int) ( $entry['postId'] ?? 0 ),
+						'isNew'  => (bool) ( $entry['isNew'] ?? false ),
+					];
+				},
+			]
+		);
+
+		register_graphql_mutation(
 			'updateProfile',
 			[
 				'inputFields'         => [

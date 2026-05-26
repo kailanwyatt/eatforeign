@@ -18,6 +18,55 @@ final class ImageAttribution {
 	/** User-facing label when an image was created with AI. */
 	public const AI_CAPTION = 'AI generated';
 
+	/** File extensions that are not usable as dish photos in the admin UI. */
+	private const BLOCKED_URL_EXTENSIONS = [
+		'pdf',
+		'djvu',
+		'djv',
+		'ogg',
+		'ogv',
+		'ogm',
+		'webm',
+		'mp4',
+		'mp3',
+		'wav',
+		'flac',
+		'mid',
+		'midi',
+		'swf',
+		'zip',
+		'tar',
+		'gz',
+		'7z',
+	];
+
+	/**
+	 * Whether a remote file URL (and optional MIME) is a displayable image.
+	 */
+	public static function is_image_url( string $url, string $mime = '' ): bool {
+		$mime = strtolower( trim( $mime ) );
+
+		if ( $mime !== '' ) {
+			return str_starts_with( $mime, 'image/' );
+		}
+
+		$path = (string) wp_parse_url( $url, PHP_URL_PATH );
+		$ext  = strtolower( pathinfo( $path, PATHINFO_EXTENSION ) );
+
+		if ( $ext !== '' && in_array( $ext, self::BLOCKED_URL_EXTENSIONS, true ) ) {
+			return false;
+		}
+
+		return ! preg_match( '/\.(pdf|djvu|djv|ogg|ogv|webm|mp4|mp3)(\?|$)/i', $url );
+	}
+
+	/**
+	 * @param array<string, string> $record
+	 */
+	public static function is_image_record( array $record ): bool {
+		return self::is_image_url( (string) ( $record['url'] ?? '' ) );
+	}
+
 	/**
 	 * @param mixed $record
 	 * @return array<string, string>
@@ -33,6 +82,11 @@ final class ImageAttribution {
 		}
 
 		$source_type = sanitize_key( (string) ( $record['sourceType'] ?? $record['source_type'] ?? self::TYPE_REMOTE ) );
+
+		if ( $source_type !== self::TYPE_AI && ! self::is_image_url( $url ) ) {
+			return [];
+		}
+
 		if ( ! in_array( $source_type, [ self::TYPE_WIKIMEDIA, self::TYPE_AI, self::TYPE_REMOTE, self::TYPE_MANUAL ], true ) ) {
 			$source_type = self::TYPE_REMOTE;
 		}

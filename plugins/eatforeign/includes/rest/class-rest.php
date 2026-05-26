@@ -15,5 +15,6 @@ final class REST {
 		add_action( 'rest_api_init', [ BootstrapController::class, 'register_routes' ] );
 		add_action( 'rest_api_init', [ AccountController::class, 'register_routes' ] );
 		add_action( 'rest_api_init', [ SocialController::class, 'register_routes' ] );
+		add_action( 'rest_api_init', [ PassportController::class, 'register_routes' ] );
 	}
 }

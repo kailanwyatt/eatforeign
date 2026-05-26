@@ -91,14 +91,60 @@ final class Types {
 		);
 
 		register_graphql_object_type(
+			'EatForeignPassportPhoto',
+			[
+				'description' => 'Passport photo with optional caption',
+				'fields'      => [
+					'url'     => [ 'type' => 'String' ],
+					'caption' => [ 'type' => 'String' ],
+				],
+			]
+		);
+
+		register_graphql_input_type(
+			'EatForeignPassportPhotoInput',
+			[
+				'fields' => [
+					'url'     => [ 'type' => 'String' ],
+					'caption' => [ 'type' => 'String' ],
+				],
+			]
+		);
+
+		register_graphql_object_type(
 			'EatForeignPassportEntry',
 			[
 				'description' => 'Food passport dish entry',
 				'fields'      => [
-					'dishSlug' => [ 'type' => 'String' ],
-					'rating'   => [ 'type' => 'Float' ],
-					'triedOn'  => [ 'type' => 'String' ],
-					'note'     => [ 'type' => 'String' ],
+					'dishId'          => [ 'type' => 'Int' ],
+					'dishSlug'        => [ 'type' => 'String' ],
+					'dishTitle'       => [ 'type' => 'String' ],
+					'rating'          => [ 'type' => 'Float' ],
+					'triedOn'         => [ 'type' => 'String' ],
+					'note'            => [ 'type' => 'String' ],
+					'photos'          => [ 'type' => [ 'list_of' => 'EatForeignPassportPhoto' ] ],
+					'imageUrl'        => [ 'type' => 'String' ],
+					'postId'          => [ 'type' => 'Int' ],
+					'restaurantName'  => [ 'type' => 'String' ],
+					'firstTimeTrying' => [ 'type' => 'Boolean' ],
+					'celebrationId'   => [ 'type' => 'Int' ],
+				],
+			]
+		);
+
+		register_graphql_object_type(
+			'EatForeignDishPassportPhoto',
+			[
+				'description' => 'Community passport photo on a dish page',
+				'fields'      => [
+					'url'               => [ 'type' => 'String' ],
+					'caption'           => [ 'type' => 'String' ],
+					'authorDisplayName' => [ 'type' => 'String' ],
+					'authorSlug'        => [ 'type' => 'String' ],
+					'authorPassportUrl' => [ 'type' => 'String' ],
+					'triedOn'           => [ 'type' => 'String' ],
+					'rating'            => [ 'type' => 'Float' ],
+					'postId'            => [ 'type' => 'Int' ],
 				],
 			]
 		);

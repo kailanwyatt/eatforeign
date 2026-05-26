@@ -203,7 +203,54 @@ final class Queries {
 					'slug' => [ 'type' => [ 'non_null' => 'String' ] ],
 				],
 				'resolve' => static function ( $root, array $args ): ?array {
-					return PassportRepository::get_by_slug( (string) $args['slug'] );
+					return PassportRepository::get_by_slug( (string) $args['slug'], get_current_user_id() );
+				},
+			]
+		);
+
+		register_graphql_field(
+			'RootQuery',
+			'myPassportEntryForDish',
+			[
+				'type'    => 'EatForeignPassportEntry',
+				'args'    => [
+					'dishId' => [ 'type' => [ 'non_null' => 'Int' ] ],
+				],
+				'resolve' => static function ( $root, array $args ): ?array {
+					if ( get_current_user_id() <= 0 ) {
+						return null;
+					}
+
+					return CommunityRepository::get_user_passport_entry_for_dish(
+						get_current_user_id(),
+						(int) $args['dishId']
+					);
+				},
+			]
+		);
+
+		register_graphql_field(
+			'RootQuery',
+			'dishPassportPhotos',
+			[
+				'type'    => [ 'list_of' => 'EatForeignDishPassportPhoto' ],
+				'args'    => [
+					'dishSlug' => [ 'type' => [ 'non_null' => 'String' ] ],
+				],
+				'resolve' => static function ( $root, array $args ): array {
+					$dish = get_page_by_path( (string) $args['dishSlug'], OBJECT, PostType::DISH );
+
+					if ( ! $dish instanceof \WP_Post ) {
+						return [];
+					}
+
+					$user_id = get_current_user_id();
+
+					return CommunityRepository::get_passport_photos_for_dish(
+						$dish->ID,
+						$user_id > 0 ? $user_id : null,
+						true
+					);
 				},
 			]
 		);
@@ -404,21 +451,7 @@ final class Queries {
 	}
 
 	private static function count_completed_celebrations( int $celebration_id ): int {
-		$users = get_users(
-			[
-				'fields'     => 'ID',
-				'number'     => 200,
-				'meta_query' => [
-					[
-						'key'     => 'ef_completed_celebration_ids',
-						'value'   => '"' . $celebration_id . '"',
-						'compare' => 'LIKE',
-					],
-				],
-			]
-		);
-
-		return is_array( $users ) ? count( $users ) : 0;
+		return CommunityRepository::count_users_who_completed_celebration( $celebration_id );
 	}
 
 	private static function average_celebration_rating( int $celebration_id ): float {

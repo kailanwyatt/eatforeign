@@ -243,6 +243,156 @@ final class CatalogRepository {
 	}
 
 	/**
+	 * Celebrations related by calendar month, country, or type (excludes current).
+	 *
+	 * @return list<WP_Post>
+	 */
+	public static function get_related_celebrations( int $celebration_id, int $limit = 6 ): array {
+		$post = get_post( $celebration_id );
+		if ( ! $post instanceof WP_Post || $post->post_type !== PostType::CELEBRATION ) {
+			return [];
+		}
+
+		$limit     = max( 1, $limit );
+		$ordered   = [];
+		$seen      = [ $celebration_id => true ];
+		$event_raw = (string) get_post_meta( $celebration_id, 'ef_event_date', true );
+		$parts     = self::parse_event_date_parts( $event_raw );
+
+		if ( $parts !== null ) {
+			$month_pattern = sprintf( '-%02d-', $parts['month'] );
+			foreach (
+				self::query_posts(
+					PostType::CELEBRATION,
+					[
+						'posts_per_page' => $limit * 3,
+						'meta_query'     => [
+							[
+								'key'     => 'ef_event_date',
+								'value'   => $month_pattern,
+								'compare' => 'LIKE',
+							],
+						],
+					]
+				) as $candidate
+			) {
+				if ( isset( $seen[ $candidate->ID ] ) ) {
+					continue;
+				}
+				$seen[ $candidate->ID ]           = true;
+				$ordered[ $candidate->ID ] = $candidate;
+			}
+		}
+
+		$country_terms = wp_get_post_terms( $celebration_id, 'ef_country', [ 'fields' => 'ids' ] );
+		if ( ! is_wp_error( $country_terms ) && $country_terms !== [] ) {
+			foreach (
+				self::query_posts(
+					PostType::CELEBRATION,
+					[
+						'posts_per_page' => $limit * 2,
+						'tax_query'      => [
+							[
+								'taxonomy' => 'ef_country',
+								'field'    => 'term_id',
+								'terms'    => array_map( 'intval', $country_terms ),
+							],
+						],
+					]
+				) as $candidate
+			) {
+				if ( isset( $seen[ $candidate->ID ] ) ) {
+					continue;
+				}
+				$seen[ $candidate->ID ]           = true;
+				$ordered[ $candidate->ID ] = $candidate;
+			}
+		}
+
+		$type_terms = wp_get_post_terms( $celebration_id, 'ef_celebration_type', [ 'fields' => 'names' ] );
+		if ( ! is_wp_error( $type_terms ) && isset( $type_terms[0] ) ) {
+			foreach (
+				self::query_posts(
+					PostType::CELEBRATION,
+					[
+						'posts_per_page' => $limit * 2,
+						'tax_query'      => [
+							[
+								'taxonomy' => 'ef_celebration_type',
+								'field'    => 'name',
+								'terms'    => (string) $type_terms[0],
+							],
+						],
+					]
+				) as $candidate
+			) {
+				if ( isset( $seen[ $candidate->ID ] ) ) {
+					continue;
+				}
+				$seen[ $candidate->ID ]           = true;
+				$ordered[ $candidate->ID ] = $candidate;
+			}
+		}
+
+		if ( count( $ordered ) < $limit ) {
+			foreach ( self::get_upcoming_celebrations( $limit * 2 ) as $candidate ) {
+				if ( isset( $seen[ $candidate->ID ] ) ) {
+					continue;
+				}
+				$seen[ $candidate->ID ]           = true;
+				$ordered[ $candidate->ID ] = $candidate;
+			}
+		}
+
+		return array_slice( array_values( $ordered ), 0, $limit );
+	}
+
+	/**
+	 * Dishes sharing the celebration's country (excludes featured dish IDs).
+	 *
+	 * @return list<WP_Post>
+	 */
+	public static function get_related_dishes_for_celebration( int $celebration_id, int $limit = 4 ): array {
+		$featured = get_post_meta( $celebration_id, 'ef_featured_dish_ids', true );
+		$exclude  = is_array( $featured ) ? array_map( 'absint', $featured ) : [];
+
+		$term_slugs = [];
+		$terms      = wp_get_post_terms( $celebration_id, 'ef_country', [ 'fields' => 'slugs' ] );
+		if ( ! is_wp_error( $terms ) ) {
+			$term_slugs = array_values( array_filter( array_map( 'strval', $terms ) ) );
+		}
+
+		if ( $term_slugs === [] && $exclude !== [] ) {
+			$first = get_post( (int) $exclude[0] );
+			if ( $first instanceof WP_Post ) {
+				$dish_terms = wp_get_post_terms( $first->ID, 'ef_country', [ 'fields' => 'slugs' ] );
+				if ( ! is_wp_error( $dish_terms ) ) {
+					$term_slugs = array_values( array_filter( array_map( 'strval', $dish_terms ) ) );
+				}
+			}
+		}
+
+		if ( $term_slugs === [] ) {
+			return [];
+		}
+
+		return self::query_posts(
+			PostType::DISH,
+			[
+				'posts_per_page' => $limit,
+				'post__not_in'   => $exclude,
+				'tax_query'      => [
+					[
+						'taxonomy' => 'ef_country',
+						'field'    => 'slug',
+						'terms'    => $term_slugs,
+					],
+				],
+			]
+		);
+	}
+
+	/**
 	 * @return list<WP_Post>
 	 */
 	public static function get_related_posts( int $post_id, string $meta_key ): array {

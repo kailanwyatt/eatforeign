@@ -16,6 +16,7 @@ use EatForeign\PostTypes\PostTypes;
 use EatForeign\REST\REST;
 use EatForeign\Support\AuthToken;
 use EatForeign\Support\Capabilities;
+use EatForeign\Support\DishImageStatus;
 use EatForeign\Support\Notifications;
 use EatForeign\Taxonomies\Taxonomies;
 
@@ -40,6 +41,7 @@ final class Plugin {
 		add_action( 'init', [ Meta::class, 'register' ], 20 );
 		add_action( 'init', [ REST::class, 'register' ], 20 );
 		add_action( 'init', [ Notifications::class, 'register' ], 20 );
+		DishImageStatus::boot();
 
 		if ( is_admin() ) {
 			Admin::boot();
@@ -60,6 +62,7 @@ final class Plugin {
 		require_once EATFOREIGN_PLUGIN_DIR . 'includes/rest/class-bootstrap-controller.php';
 		require_once EATFOREIGN_PLUGIN_DIR . 'includes/rest/class-account-controller.php';
 		require_once EATFOREIGN_PLUGIN_DIR . 'includes/rest/class-social-controller.php';
+		require_once EATFOREIGN_PLUGIN_DIR . 'includes/rest/class-passport-controller.php';
 		require_once EATFOREIGN_PLUGIN_DIR . 'includes/graphql/class-graphql.php';
 		require_once EATFOREIGN_PLUGIN_DIR . 'includes/graphql/class-types.php';
 		require_once EATFOREIGN_PLUGIN_DIR . 'includes/graphql/class-queries.php';
@@ -70,7 +73,9 @@ final class Plugin {
 		require_once EATFOREIGN_PLUGIN_DIR . 'includes/repositories/class-passport-repository.php';
 		require_once EATFOREIGN_PLUGIN_DIR . 'includes/support/class-post-type.php';
 		require_once EATFOREIGN_PLUGIN_DIR . 'includes/support/class-sanitizer.php';
+		require_once EATFOREIGN_PLUGIN_DIR . 'includes/support/class-dish-image-status.php';
 		require_once EATFOREIGN_PLUGIN_DIR . 'includes/support/class-image-attribution.php';
+		require_once EATFOREIGN_PLUGIN_DIR . 'includes/support/class-passport-photo.php';
 		require_once EATFOREIGN_PLUGIN_DIR . 'includes/support/class-capabilities.php';
 		require_once EATFOREIGN_PLUGIN_DIR . 'includes/support/class-auth-token.php';
 		require_once EATFOREIGN_PLUGIN_DIR . 'includes/support/class-notifications.php';
