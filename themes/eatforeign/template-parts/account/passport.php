@@ -24,64 +24,52 @@ if (! is_array( $profile ) || $profile === [] ) {
 
 $slug    = isset( $profile['slug'] ) ? (string) $profile['slug'] : '';
 $entries = isset( $profile['entries'] ) && is_array( $profile['entries'] ) ? $profile['entries'] : [];
-$dish_pt = class_exists( '\EatForeign\Support\PostType' ) ? \EatForeign\Support\PostType::DISH : 'ef_dish';
+$user    = is_user_logged_in() ? wp_get_current_user() : null;
 
 ?>
-<section class="ef-panel ef-account-panel">
-	<h2 class="ef-account-panel__title"><?php esc_html_e( 'Food Passport', 'eatforeign' ); ?></h2>
-	<p class="ef-account-panel__intro"><?php esc_html_e( 'Your tasting history and celebration progress.', 'eatforeign' ); ?></p>
-	<p class="ef-card__copy">
-		<?php
-		echo esc_html(
-			sprintf(
-				/* translators: 1: countries, 2: dishes, 3: celebrations */
-				__( '%1$d countries explored · %2$d dishes tried · %3$d celebrations completed', 'eatforeign' ),
-				(int) ( $profile['countriesExplored'] ?? 0 ),
-				(int) ( $profile['dishesTried'] ?? 0 ),
-				(int) ( $profile['celebrationsCompleted'] ?? 0 )
-			)
-		);
-		?>
+<?php
+get_template_part(
+	'template-parts/passport',
+	'profile-hero',
+	[
+		'passport' => $profile,
+		'user'     => $user instanceof WP_User ? $user : null,
+		'is_owner' => true,
+	]
+);
+?>
+
+<?php if ( $slug !== '' ) : ?>
+	<p class="ef-account-passport-public-link">
+		<a href="<?php echo esc_url( home_url( '/passport/' . rawurlencode( $slug ) ) ); ?>">
+			<?php esc_html_e( 'View how your passport looks to others', 'eatforeign' ); ?>
+		</a>
 	</p>
-	<?php if ( $slug !== '' ) : ?>
-		<p class="ef-form-footer">
-			<a class="ef-button ef-button--primary" href="<?php echo esc_url( home_url( '/passport/' . rawurlencode( $slug ) ) ); ?>">
-				<?php esc_html_e( 'View public passport', 'eatforeign' ); ?>
-			</a>
-		</p>
-	<?php endif; ?>
-</section>
+<?php endif; ?>
 
 <?php if ( $entries !== [] ) : ?>
-	<section class="ef-section ef-account-passport-entries">
-		<header class="ef-section__header">
-			<h2 class="ef-section__title"><?php esc_html_e( 'Tried dishes', 'eatforeign' ); ?></h2>
+	<section class="ef-passport-feed-section ef-account-passport-entries">
+		<header class="ef-passport-feed-section__header">
+			<h2 class="ef-passport-feed-section__title"><?php esc_html_e( 'Tried dishes', 'eatforeign' ); ?></h2>
 		</header>
-		<div class="ef-section__content">
-			<ul class="ef-entry-list">
-				<?php foreach ( $entries as $entry ) : ?>
-					<?php
-					$dish_slug = isset( $entry['dishSlug'] ) ? (string) $entry['dishSlug'] : '';
-					$dish_post = $dish_slug !== '' ? get_page_by_path( $dish_slug, OBJECT, $dish_pt ) : null;
-					$dish_url  = $dish_post instanceof \WP_Post ? get_permalink( $dish_post ) : home_url( '/directory' );
-					?>
-					<li class="ef-entry">
-						<a href="<?php echo esc_url( $dish_url ); ?>"><?php echo esc_html( $dish_post instanceof \WP_Post ? $dish_post->post_title : $dish_slug ); ?></a>
-						<span class="ef-entry__rating"><?php echo esc_html( number_format( (float) ( $entry['rating'] ?? 0 ), 1 ) ); ?></span>
-						<?php if ( Data::has_text( $entry['note'] ?? '' ) ) : ?>
-							<p class="ef-entry__note"><?php echo esc_html( (string) $entry['note'] ); ?></p>
-						<?php endif; ?>
-						<?php
-						$photos = isset( $entry['photos'] ) && is_array( $entry['photos'] ) ? $entry['photos'] : [];
-						get_template_part(
-							'template-parts/passport-entry',
-							'photos',
-							[ 'photos' => $photos ]
-						);
-						?>
-					</li>
-				<?php endforeach; ?>
-			</ul>
+		<div class="ef-passport-feed-list">
+			<?php foreach ( $entries as $entry ) : ?>
+				<?php
+				if ( ! is_array( $entry ) ) {
+					continue;
+				}
+
+				get_template_part(
+					'template-parts/passport',
+					'feed-item',
+					[
+						'entry'    => $entry,
+						'passport' => $profile,
+						'user'     => $user instanceof WP_User ? $user : null,
+					]
+				);
+				?>
+			<?php endforeach; ?>
 		</div>
 	</section>
 <?php endif; ?>

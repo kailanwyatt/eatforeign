@@ -83,6 +83,45 @@ final class Theme {
 				true
 			);
 		}
+
+		if ( Helpers::current_ef_route() === 'countries' ) {
+			$country_count = class_exists( Data::class ) ? count( Data::all_countries() ) : 0;
+
+			wp_enqueue_script(
+				'eatforeign-countries-filter',
+				get_template_directory_uri() . '/assets/countries-filter.js',
+				[],
+				self::asset_version( 'countries-filter.js' ),
+				true
+			);
+
+			wp_localize_script(
+				'eatforeign-countries-filter',
+				'efCountriesFilter',
+				[
+					'total' => $country_count,
+					'i18n'  => [
+						'all'   => sprintf(
+							/* translators: %d: country count */
+							__( 'Showing all {total} countries', 'eatforeign' ),
+							$country_count
+						),
+						'match' => __( '{visible} of {total} countries match "{query}"', 'eatforeign' ),
+						'empty' => __( 'No countries match your search. Try another keyword.', 'eatforeign' ),
+					],
+				]
+			);
+		}
+	}
+
+	public static function logo_url(): string {
+		$path = get_template_directory() . '/assets/eatforeign-logo.png';
+
+		if ( ! file_exists( $path ) ) {
+			return get_template_directory_uri() . '/assets/eatforeign-logo.png';
+		}
+
+		return get_template_directory_uri() . '/assets/eatforeign-logo.png?v=' . (string) filemtime( $path );
 	}
 
 	public static function render_favicon(): void {

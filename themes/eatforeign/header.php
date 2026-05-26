@@ -35,7 +35,16 @@ $redirect = esc_url_raw( $scheme . '://' . $host . $req_path );
 <header class="ef-site-header">
 	<div class="ef-shell ef-site-header__inner">
 		<div class="ef-site-header__brand-row">
-			<a class="ef-brand" href="<?php echo esc_url( home_url( '/' ) ); ?>"><?php bloginfo( 'name' ); ?></a>
+			<?php
+			get_template_part(
+				'template-parts/site',
+				'logo',
+				[
+					'link'    => true,
+					'variant' => 'header',
+				]
+			);
+			?>
 			<nav class="ef-nav" aria-label="<?php esc_attr_e( 'Primary', 'eatforeign' ); ?>">
 				<?php Nav::render_primary(); ?>
 			</nav>

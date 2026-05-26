@@ -55,26 +55,6 @@ $calendar_day_url = static function ( int $year, int $month, int $day ): string 
 	);
 };
 
-$calendar_celebration_url = static function ( int $year, int $month, int $day, WP_Post $celebration ) use ( $calendar_day_url ): string {
-	return add_query_arg(
-		'c',
-		$celebration->post_name,
-		$calendar_day_url( $year, $month, $day )
-	) . '#calendar-celebration-preview';
-};
-
-$selected_slug = isset( $_GET['c'] ) ? sanitize_title( wp_unslash( (string) $_GET['c'] ) ) : '';
-$focused_event = null;
-
-if ( $selected_slug !== '' ) {
-	foreach ( $selected_events as $event_post ) {
-		if ( $event_post instanceof WP_Post && $event_post->post_name === $selected_slug ) {
-			$focused_event = $event_post;
-			break;
-		}
-	}
-}
-
 $prev_m = $m === 1 ? 12 : $m - 1;
 $prev_y = $m === 1 ? $y - 1 : $y;
 $next_m = $m === 12 ? 1 : $m + 1;
@@ -195,16 +175,16 @@ $weeks = array_chunk( $cells, 7 );
 												continue;
 											}
 
-											$chip_flag     = Data::celebration_flag_emoji( $ev );
-											$chip_selected = $is_sel && $focused_event instanceof WP_Post && $focused_event->ID === $ev->ID;
-											$chip_href     = esc_url( $calendar_celebration_url( $y, $m, $d, $ev ) );
-											$chip_classes  = 'ef-calendar-chip';
-
-											if ( $chip_selected ) {
-												$chip_classes .= ' is-selected';
-											}
+											$chip_flag    = Data::celebration_flag_emoji( $ev );
+											$chip_preview = Data::calendar_chip_preview( $ev );
+											$chip_href    = esc_url( $chip_preview['href'] );
+											$chip_data    = esc_attr( wp_json_encode( $chip_preview ) );
 											?>
-											<a class="<?php echo esc_attr( $chip_classes ); ?>" href="<?php echo $chip_href; ?>">
+											<a
+												class="ef-calendar-chip"
+												href="<?php echo $chip_href; ?>"
+												data-chip-preview="<?php echo $chip_data; ?>"
+											>
 												<?php if ( $chip_flag !== '' ) : ?>
 													<span class="ef-calendar-chip__flag" aria-hidden="true"><?php echo esc_html( $chip_flag ); ?></span>
 												<?php endif; ?>
@@ -223,6 +203,7 @@ $weeks = array_chunk( $cells, 7 );
 					</div>
 				<?php endforeach; ?>
 			</div>
+			<?php get_template_part( 'template-parts/calendar', 'pin-overlay' ); ?>
 		</div>
 
 		<section class="ef-calendar-detail">
@@ -243,19 +224,9 @@ $weeks = array_chunk( $cells, 7 );
 			<?php if ( $selected_events === [] ) : ?>
 				<p class="ef-muted"><?php esc_html_e( 'No celebrations in the catalog for this date.', 'eatforeign' ); ?></p>
 			<?php else : ?>
-				<?php if ( $focused_event instanceof WP_Post ) : ?>
-					<?php
-					get_template_part(
-						'template-parts/calendar-celebration',
-						'preview',
-						[ 'post' => $focused_event ]
-					);
-					?>
-				<?php else : ?>
-					<p class="ef-calendar-detail__hint ef-muted">
-						<?php esc_html_e( 'Select a celebration in the calendar above to preview it here.', 'eatforeign' ); ?>
-					</p>
-				<?php endif; ?>
+				<p class="ef-calendar-detail__hint ef-muted">
+					<?php esc_html_e( 'Hover a celebration in the calendar for a quick preview; click to open its dish.', 'eatforeign' ); ?>
+				</p>
 				<div class="ef-grid ef-grid--calendar-detail">
 					<?php
 					foreach ( $selected_events as $post ) {
@@ -263,14 +234,16 @@ $weeks = array_chunk( $cells, 7 );
 							continue;
 						}
 
-						$wrap_class = 'ef-calendar-detail__card';
+						$dish = Data::celebration_primary_dish( $post->ID );
 
-						if ( $focused_event instanceof WP_Post && $focused_event->ID === $post->ID ) {
-							$wrap_class .= ' is-highlighted';
+						echo '<div class="ef-calendar-detail__card">';
+
+						if ( $dish instanceof WP_Post ) {
+							get_template_part( 'template-parts/card', 'dish', [ 'post' => $dish ] );
+						} else {
+							get_template_part( 'template-parts/card', 'celebration', [ 'post' => $post ] );
 						}
 
-						echo '<div class="' . esc_attr( $wrap_class ) . '">';
-						get_template_part( 'template-parts/card', 'celebration', [ 'post' => $post ] );
 						echo '</div>';
 					}
 					?>

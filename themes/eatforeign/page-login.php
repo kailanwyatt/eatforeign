@@ -15,7 +15,16 @@ $redirect_to = wp_validate_redirect( $redirect_to, '' );
 ?>
 <div class="ef-auth">
 	<div class="ef-auth__promo">
-		<p class="ef-auth__brand"><?php bloginfo( 'name' ); ?></p>
+		<?php
+		get_template_part(
+			'template-parts/site',
+			'logo',
+			[
+				'link'    => true,
+				'variant' => 'auth',
+			]
+		);
+		?>
 		<p class="ef-auth__lead">
 			<?php esc_html_e( 'Join a global table of daily celebrations, dishes, and food stories.', 'eatforeign' ); ?>
 		</p>

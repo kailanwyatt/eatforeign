@@ -12,7 +12,7 @@ namespace EatForeignTheme;
 final class Routes {
 	private const QUERY_VAR = 'ef_page';
 
-	private const REWRITE_VERSION = '7';
+	private const REWRITE_VERSION = '8';
 
 	/**
 	 * Public catalog post types and URL prefixes.
@@ -35,6 +35,7 @@ final class Routes {
 		'calendar',
 		'directory',
 		'countries',
+		'suggest',
 	];
 
 	public static function init(): void {
@@ -121,6 +122,7 @@ final class Routes {
 			'calendar'        => 'page-calendar.php',
 			'directory'       => 'page-directory.php',
 			'countries'       => 'page-countries.php',
+			'suggest'         => 'page-suggest.php',
 			'dish-passport'   => 'page-dish-passport.php',
 		];
 

@@ -29,6 +29,55 @@ final class Helpers {
 	/**
 	 * @param list<array{dishSlug?: string, rating?: float}> $entries
 	 */
+	public static function rating_stars( float $rating ): string {
+		$filled = max( 0, min( 5, (int) round( $rating ) ) );
+
+		return str_repeat( '★', $filled ) . str_repeat( '☆', 5 - $filled );
+	}
+
+	public static function format_passport_date( string $date ): string {
+		$date = trim( $date );
+
+		if ( $date === '' ) {
+			return '';
+		}
+
+		$timestamp = strtotime( $date );
+
+		if ( $timestamp === false ) {
+			return '';
+		}
+
+		return (string) wp_date( get_option( 'date_format' ), $timestamp );
+	}
+
+	/**
+	 * @param list<array{url?: string, caption?: string}> $photos
+	 * @return list<array{url: string, caption: string}>
+	 */
+	public static function normalize_passport_photos( array $photos ): array {
+		$normalized = [];
+
+		foreach ( $photos as $photo ) {
+			if ( ! is_array( $photo ) ) {
+				continue;
+			}
+
+			$url = isset( $photo['url'] ) ? trim( (string) $photo['url'] ) : '';
+
+			if ( $url === '' ) {
+				continue;
+			}
+
+			$normalized[] = [
+				'url'     => $url,
+				'caption' => isset( $photo['caption'] ) ? trim( (string) $photo['caption'] ) : '',
+			];
+		}
+
+		return $normalized;
+	}
+
 	public static function average_rating_from_entries( array $entries ): float {
 		$sum = 0.0;
 		$n   = 0;

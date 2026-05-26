@@ -31,6 +31,74 @@ final class Auth {
 		add_action( 'admin_post_ef_create_celebration_post', [ self::class, 'handle_create_celebration_post' ] );
 		add_action( 'admin_post_nopriv_ef_set_location', [ self::class, 'handle_set_location' ] );
 		add_action( 'admin_post_ef_set_location', [ self::class, 'handle_set_location' ] );
+		add_action( 'admin_post_nopriv_ef_submit_suggestion', [ self::class, 'handle_submit_suggestion' ] );
+		add_action( 'admin_post_ef_submit_suggestion', [ self::class, 'handle_submit_suggestion' ] );
+	}
+
+	public static function handle_submit_suggestion(): void {
+		self::verify_nonce( 'ef_submit_suggestion' );
+
+		$redirect = home_url( '/suggest' );
+		$name     = sanitize_text_field( (string) ( $_POST['name'] ?? '' ) );
+		$email    = sanitize_email( (string) ( $_POST['email'] ?? '' ) );
+		$type     = sanitize_key( (string) ( $_POST['suggestion_type'] ?? 'other' ) );
+		$title    = sanitize_text_field( (string) ( $_POST['title'] ?? '' ) );
+		$body     = sanitize_textarea_field( (string) ( $_POST['description'] ?? '' ) );
+		$source   = esc_url_raw( (string) ( $_POST['source_url'] ?? '' ) );
+
+		$allowed_types = [ 'dish', 'holiday', 'other' ];
+
+		if ( ! in_array( $type, $allowed_types, true ) ) {
+			$type = 'other';
+		}
+
+		if ( $email === '' || $title === '' || $body === '' ) {
+			self::redirect_with_error( $redirect, __( 'Email, title, and description are required.', 'eatforeign' ) );
+		}
+
+		$admin_email = sanitize_email( (string) get_option( 'admin_email' ) );
+
+		if ( $admin_email === '' ) {
+			self::redirect_with_error( $redirect, __( 'Could not send your suggestion. Please try again later.', 'eatforeign' ) );
+		}
+
+		$type_labels = [
+			'dish'    => __( 'Dish', 'eatforeign' ),
+			'holiday' => __( 'Food holiday', 'eatforeign' ),
+			'other'   => __( 'Other', 'eatforeign' ),
+		];
+		$type_label  = $type_labels[ $type ] ?? $type_labels['other'];
+
+		$message  = __( 'New EatForeign catalog suggestion', 'eatforeign' ) . "\n\n";
+		$message .= __( 'Type:', 'eatforeign' ) . ' ' . $type_label . "\n";
+		$message .= __( 'Title:', 'eatforeign' ) . ' ' . $title . "\n";
+		$message .= __( 'From:', 'eatforeign' ) . ' ' . ( $name !== '' ? $name : __( '(not provided)', 'eatforeign' ) ) . "\n";
+		$message .= __( 'Email:', 'eatforeign' ) . ' ' . $email . "\n\n";
+		$message .= __( 'Description:', 'eatforeign' ) . "\n" . $body . "\n";
+
+		if ( $source !== '' ) {
+			$message .= "\n" . __( 'Source:', 'eatforeign' ) . ' ' . $source . "\n";
+		}
+
+		$sent = wp_mail(
+			$admin_email,
+			sprintf(
+				/* translators: %s: suggestion title */
+				__( '[EatForeign] Suggestion: %s', 'eatforeign' ),
+				$title
+			),
+			$message,
+			[
+				'Reply-To: ' . $email,
+			]
+		);
+
+		if ( ! $sent ) {
+			self::redirect_with_error( $redirect, __( 'Could not send your suggestion. Please try again later.', 'eatforeign' ) );
+		}
+
+		wp_safe_redirect( add_query_arg( 'submitted', '1', $redirect ) );
+		exit;
 	}
 
 	public static function handle_login(): void {

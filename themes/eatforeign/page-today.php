@@ -1,6 +1,6 @@
 <?php
 /**
- * Front page — Today feed.
+ * Template for the static "Today" homepage page (if used in Reading settings).
  *
  * @package EatForeignTheme
  */

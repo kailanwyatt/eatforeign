@@ -14,7 +14,16 @@ use EatForeignTheme\Nav;
 <footer class="ef-site-footer">
 	<div class="ef-shell ef-site-footer__grid">
 		<div class="ef-site-footer__col ef-site-footer__brand">
-			<p class="ef-site-footer__logo"><?php bloginfo( 'name' ); ?></p>
+			<?php
+			get_template_part(
+				'template-parts/site',
+				'logo',
+				[
+					'link'    => true,
+					'variant' => 'footer',
+				]
+			);
+			?>
 			<p class="ef-site-footer__tagline">
 				<?php esc_html_e( 'The world\'s food celebration calendar for discovering cultures, dishes, and places to eat together.', 'eatforeign' ); ?>
 			</p>

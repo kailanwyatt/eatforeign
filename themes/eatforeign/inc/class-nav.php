@@ -60,7 +60,7 @@ final class Nav {
 				<a href="<?php echo esc_url( home_url( '/passport' ) ); ?>"><?php esc_html_e( 'Passport', 'eatforeign' ); ?></a>
 			</li>
 			<li>
-				<a href="<?php echo esc_url( home_url( '/#explore-by-country' ) ); ?>"><?php esc_html_e( 'Explore', 'eatforeign' ); ?></a>
+				<a href="<?php echo esc_url( home_url( '/countries' ) ); ?>"><?php esc_html_e( 'Explore', 'eatforeign' ); ?></a>
 			</li>
 		</ul>
 		<?php
@@ -140,7 +140,7 @@ final class Nav {
 				[ home_url( '/directory' ), __( 'Food directory', 'eatforeign' ) ],
 				[ home_url( '/passport' ), __( 'Food passport', 'eatforeign' ) ],
 				[ home_url( '/' ), __( 'Home', 'eatforeign' ) ],
-				[ home_url( '/#explore-by-country' ), __( 'Explore by country', 'eatforeign' ) ],
+				[ home_url( '/countries' ), __( 'Explore by country', 'eatforeign' ) ],
 			]
 		);
 	}

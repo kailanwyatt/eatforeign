@@ -128,6 +128,19 @@ final class Data {
 	}
 
 	/**
+	 * True when the catalog has no today, upcoming, or trending content to show.
+	 */
+	public static function today_page_needs_fallback_panel(): bool {
+		if ( ! self::plugin_ready() ) {
+			return false;
+		}
+
+		return self::today_celebrations() === []
+			&& self::upcoming_celebrations( 4 ) === []
+			&& self::trending_dishes( 4 ) === [];
+	}
+
+	/**
 	 * @return list<WP_Post>
 	 */
 	public static function trending_dishes( int $limit = 6 ): array {
@@ -234,6 +247,122 @@ final class Data {
 	}
 
 	/**
+	 * Image for country cards: country photo, else a linked dish photo, else placeholder.
+	 *
+	 * @return array{url: string, alt: string, is_placeholder: bool, dish: WP_Post|null}
+	 */
+	public static function country_card_image( WP_Post $country ): array {
+		$name          = self::country_display_name( $country );
+		$country_image = self::post_image( $country );
+
+		if ( $country_image !== '' ) {
+			return [
+				'url'            => $country_image,
+				'alt'            => $name,
+				'is_placeholder' => false,
+				'dish'           => null,
+			];
+		}
+
+		foreach ( self::posts_by_ids( (array) get_post_meta( $country->ID, 'ef_dish_ids', true ) ) as $dish ) {
+			if ( ! $dish instanceof WP_Post ) {
+				continue;
+			}
+
+			$dish_image = self::post_image( $dish );
+
+			if ( $dish_image !== '' ) {
+				return [
+					'url'            => $dish_image,
+					'alt'            => sprintf(
+						/* translators: 1: dish name, 2: country name */
+						__( '%1$s — dish from %2$s', 'eatforeign' ),
+						get_the_title( $dish ),
+						$name
+					),
+					'is_placeholder' => false,
+					'dish'           => $dish,
+				];
+			}
+		}
+
+		if ( self::plugin_ready() && taxonomy_exists( 'ef_country' ) ) {
+			$term = get_term_by( 'slug', $country->post_name, 'ef_country' );
+
+			if ( ! $term instanceof WP_Term ) {
+				$term = get_term_by( 'name', $name, 'ef_country' );
+			}
+
+			if ( $term instanceof WP_Term ) {
+				$dishes = CatalogRepository::query_posts(
+					PostType::DISH,
+					[
+						'posts_per_page' => 1,
+						'orderby'        => 'rand',
+						'tax_query'      => [
+							[
+								'taxonomy' => 'ef_country',
+								'field'    => 'term_id',
+								'terms'    => [ (int) $term->term_id ],
+							],
+						],
+					]
+				);
+
+				$dish = $dishes[0] ?? null;
+
+				if ( $dish instanceof WP_Post ) {
+					$dish_image = self::post_image( $dish );
+
+					if ( $dish_image !== '' ) {
+						return [
+							'url'            => $dish_image,
+							'alt'            => sprintf(
+								/* translators: 1: dish name, 2: country name */
+								__( '%1$s — dish from %2$s', 'eatforeign' ),
+								get_the_title( $dish ),
+								$name
+							),
+							'is_placeholder' => false,
+							'dish'           => $dish,
+						];
+					}
+				}
+			}
+		}
+
+		return [
+			'url'            => self::placeholder_image_url(),
+			'alt'            => $name,
+			'is_placeholder' => true,
+			'dish'           => null,
+		];
+	}
+
+	/**
+	 * Lowercase haystack for client-side country search (name, overview, dish, slug).
+	 */
+	public static function country_search_text( WP_Post $country ): string {
+		$overview = (string) get_post_meta( $country->ID, 'ef_overview', true );
+		$excerpt  = get_the_excerpt( $country );
+		$copy     = self::has_text( $overview ) ? $overview : $excerpt;
+		$card     = self::country_card_image( $country );
+
+		$parts = [
+			get_the_title( $country ),
+			self::country_display_name( $country ),
+			$country->post_name,
+			$copy,
+		];
+
+		if ( isset( $card['dish'] ) && $card['dish'] instanceof WP_Post ) {
+			$parts[] = get_the_title( $card['dish'] );
+		}
+
+		return strtolower( implode( ' ', array_filter( $parts, static fn ( string $part ): bool => $part !== '' ) ) );
+	}
+
+	/**
 	 * @return list<WP_Post>
 	 */
 	public static function upcoming_celebrations( int $limit = 6 ): array {
@@ -252,6 +381,60 @@ final class Data {
 	 */
 	public static function related_dishes_for_celebration( int $celebration_id, int $limit = 4 ): array {
 		return self::plugin_ready() ? CatalogRepository::get_related_dishes_for_celebration( $celebration_id, $limit ) : [];
+	}
+
+	/**
+	 * Primary dish for a celebration (featured first, then related).
+	 */
+	public static function celebration_primary_dish( int $celebration_id ): ?WP_Post {
+		$featured = self::posts_by_ids( (array) get_post_meta( $celebration_id, 'ef_featured_dish_ids', true ) );
+
+		if ( $featured !== [] ) {
+			return $featured[0];
+		}
+
+		$related = self::related_dishes_for_celebration( $celebration_id, 1 );
+
+		return $related[0] ?? null;
+	}
+
+	/**
+	 * Hover preview + link target for a calendar celebration chip.
+	 *
+	 * @return array{href: string, title: string, subtitle: string, image: string, flag: string, copy: string, label: string}
+	 */
+	public static function calendar_chip_preview( WP_Post $celebration ): array {
+		$dish         = self::celebration_primary_dish( $celebration->ID );
+		$link_post    = $dish ?? $celebration;
+		$celebration_title = get_the_title( $celebration );
+
+		if ( $dish instanceof WP_Post ) {
+			$copy = get_the_excerpt( $dish );
+		} else {
+			$copy = (string) get_post_meta( $celebration->ID, 'ef_short_description', true );
+
+			if ( $copy === '' ) {
+				$copy = get_the_excerpt( $celebration );
+			}
+		}
+
+		if ( self::has_text( $copy ) ) {
+			$copy = wp_trim_words( $copy, 14, '…' );
+		} else {
+			$copy = '';
+		}
+
+		return [
+			'href'     => self::catalog_permalink( $link_post ),
+			'title'    => get_the_title( $link_post ),
+			'subtitle' => $dish instanceof WP_Post ? $celebration_title : '',
+			'image'    => self::post_display_image( $link_post ),
+			'flag'     => self::celebration_flag_emoji( $celebration ),
+			'copy'     => $copy,
+			'label'    => $dish instanceof WP_Post
+				? __( 'Dish', 'eatforeign' )
+				: __( 'Celebration', 'eatforeign' ),
+		];
 	}
 
 	/**
@@ -348,7 +531,7 @@ final class Data {
 	}
 
 	public static function placeholder_image_url(): string {
-		return get_template_directory_uri() . '/assets/placeholder-card.svg';
+		return get_template_directory_uri() . '/assets/placeholder-card.png';
 	}
 
 	public static function post_display_image( WP_Post $post ): string {
@@ -465,6 +648,35 @@ final class Data {
 		}
 
 		return CommunityRepository::get_user_passport_entry_for_dish( $user_id, $dish_id );
+	}
+
+	/**
+	 * Passport feed image: user upload first, else the dish catalog hero.
+	 */
+	public static function passport_entry_image( array $entry, ?WP_Post $dish = null ): string {
+		$url = isset( $entry['imageUrl'] ) ? trim( (string) $entry['imageUrl'] ) : '';
+
+		if ( $url !== '' ) {
+			return $url;
+		}
+
+		if ( ! $dish instanceof WP_Post ) {
+			$dish_id = (int) ( $entry['dishId'] ?? 0 );
+
+			if ( $dish_id > 0 ) {
+				$dish = get_post( $dish_id );
+			}
+		}
+
+		if ( $dish instanceof WP_Post ) {
+			return self::post_display_image( $dish );
+		}
+
+		return self::placeholder_image_url();
+	}
+
+	public static function passport_entry_uses_dish_image( array $entry ): bool {
+		return ! self::has_text( $entry['imageUrl'] ?? '' );
 	}
 
 	public static function user_rating_for_dish( int $dish_id ): float {
